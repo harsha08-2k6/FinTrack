@@ -23,11 +23,11 @@ spring:
           predicates:
             - Path=/api/categories/**
 
-        # Expense Service Route
-        - id: expense-service
-          uri: lb://EXPENSE-SERVICE
+        # Transaction Service Route (handles Transactions, Income, and Expenses)
+        - id: transaction-service
+          uri: lb://TRANSACTION-SERVICE
           predicates:
-            - Path=/api/expenses/**
+            - Path=/api/transactions/**, /api/income/**, /api/expenses/**
 
         # Report Service Route
         - id: report-service

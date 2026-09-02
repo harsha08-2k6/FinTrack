@@ -171,14 +171,17 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
               <div style={{
                 width: '38px',
                 height: '38px',
-                borderRadius: '10px',
-                background: '#10B981',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
               }}>
-                <LayoutGrid size={22} color="#FFFFFF" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3v18h18" />
+                  <path d="m19 9-5 5-4-4-3 3" />
+                </svg>
               </div>
               <h2 style={{ fontSize: '1.4rem', fontWeight: '800', letterSpacing: '-0.01em', color: '#FFFFFF' }}>
                 FinTrack
@@ -187,6 +190,21 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
 
             {/* Headline with animated cross-fade */}
             <div key={mode} className="auth-fade-in">
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.25rem 0.65rem',
+                borderRadius: '20px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#10B981',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                marginBottom: '1rem',
+                letterSpacing: '0.05em'
+              }}>
+                TRACK. ANALYZE. SAVE.
+              </div>
               <h1 style={{
                 fontSize: '2.5rem',
                 fontWeight: '800',
@@ -197,15 +215,15 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
               }}>
                 {mode === 'login' ? (
                   <>
-                    Corporate expenses,<br />
+                    Personal finances,<br />
                     <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#10B981', fontWeight: '400', marginRight: '0.25rem' }}>
-                      fully
+                      smartly
                     </span>
-                    in control.
+                    managed.
                   </>
                 ) : (
                   <>
-                    Corporate finance,<br />
+                    Income, budgets & expenses,<br />
                     <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#10B981', fontWeight: '400', marginRight: '0.25rem' }}>
                       seamlessly
                     </span>
@@ -222,8 +240,8 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
                 marginBottom: '2.5rem'
               }}>
                 {mode === 'login' 
-                  ? 'Corporate expense tracking and real-time budget governance across distributed microservices.'
-                  : 'Create your corporate profile to manage expenses, set budget thresholds, and review analytical reports.'
+                  ? 'Track your monthly salary, analyze daily outflows, and maximize your savings rate with intelligent analytics.'
+                  : 'Create your account to track income streams, manage category budgets, and monitor stock-market styled trajectories.'
                 }
               </p>
             </div>

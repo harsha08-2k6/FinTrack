@@ -1,6 +1,8 @@
-# FinTrack: Corporate Expense Management System
+# FinTrack - Personal Financial Expense Analytics & Budget Management System
 
-FinTrack is an enterprise-grade, distributed corporate expense management and financial intelligence system designed as a full-stack **B.Tech 3rd-Year Computer Science Project**. It follows clean architecture, the **Database-per-Service** design pattern, Spring Cloud microservices ecosystem, and a clean Navy + Emerald React dashboard.
+> **Tagline**: *Track. Analyze. Save.*
+
+FinTrack is an enterprise-grade, distributed Personal Financial Expense Analytics & Budget Management System built with a Spring Cloud Microservices Architecture and a Modern React Dashboard.
 
 ---
 
@@ -22,9 +24,10 @@ FinTrack is an enterprise-grade, distributed corporate expense management and fi
               │                               │                               │
               ▼                               ▼                               ▼
   ┌───────────────────────┐       ┌───────────────────────┐       ┌───────────────────────┐
-  │      Auth Service     │       │   Category Service    │       │    Expense Service    │
-  │  Port 8081 | DB: auth │       │ Port 8082 | DB: cat   │◄──────┤ Port 8083 | DB: exp   │
-  └───────────────────────┘       └───────────────────────┘ Feign └───────────┬───────────┘
+  │      Auth Service     │       │   Category Service    │       │  Transaction Service  │
+  │  Port 8081 | DB: auth │       │ Port 8082 | DB: cat   │◄──────┤ (Income & Expenses)   │
+  └───────────────────────┘       └───────────────────────┘ Feign │ Port 8083 | DB: exp   │
+                                                                  └───────────┬───────────┘
                                                                               │
                                                                               │ Feign
                                                                               ▼
@@ -45,123 +48,92 @@ FinTrack is an enterprise-grade, distributed corporate expense management and fi
 
 ## 🚀 Port Allocation Matrix
 
-| Service | Port | Database | Technology |
+| Service | Port | Database | Role & Endpoints |
 | :--- | :--- | :--- | :--- |
-| **Eureka Server** | `8761` | N/A | Spring Cloud Netflix Eureka |
-| **API Gateway** | `8080` | N/A | Spring Cloud Gateway (Reactive) |
-| **Auth Service** | `8081` | `spendwise_auth` | Spring Boot 3 + Spring Security 6 + JJWT |
-| **Category Service** | `8082` | `spendwise_category` | Spring Boot 3 + Spring Data JPA |
-| **Expense Service** | `8083` | `spendwise_expense` | Spring Boot 3 + Spring Data JPA + OpenFeign |
-| **Report Service** | `8084` | `spendwise_report` | Spring Boot 3 + Spring Data JPA + OpenFeign |
-| **React Frontend** | `5173` | Browser Storage | React 18 + Vite + Modern Glassmorphic CSS |
+| **Eureka Server** | `8761` | N/A | Service Discovery Registry |
+| **API Gateway** | `8080` | N/A | Reverse Proxy, Dynamic Routing, CORS Filter |
+| **Auth Service** | `8081` | `spendwise_auth` | User Registration, JWT Login, Profile Management |
+| **Category Service** | `8082` | `spendwise_category` | Budget Categories (Food, Travel, Bills, etc.) & Monthly Spending Caps |
+| **Transaction Service** | `8083` | `spendwise_expense` | **Income & Expenses** (`/api/transactions`, `/api/income`, `/api/expenses`) |
+| **Report Service** | `8084` | `spendwise_report` | Savings Rate, Cashflow Analytics, Stock Market Trajectory |
+| **React Frontend** | `5173` | Local Storage / State | React 18, Vite, Deep Navy + Emerald Design System |
 
 ---
 
-## 📂 Project Structure
+## 📂 Final Feature Structure
 
 ```text
-SpendWise/
-├── frontend/                     # React + Vite Application
-│   ├── public/
-│   ├── src/
-│   │   ├── assets/              # Icons, illustrations, branding
-│   │   ├── components/          # Reusable UI components
-│   │   ├── pages/               # Screen views (Dashboard, Expenses, Reports, etc.)
-│   │   ├── services/            # API integration modules
-│   │   ├── context/             # React AuthContext & Global State
-│   │   ├── hooks/               # Custom React hooks
-│   │   ├── utils/               # Formatters & Token utilities
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   ├── package.json
-│   └── vite.config.js
+FINTRACK
 │
-├── backend/                      # Spring Cloud Microservices
-│   ├── eureka-server/           # Service Discovery Registry (:8761)
-│   ├── api-gateway/             # Central Request Router & Filter (:8080)
-│   ├── auth-service/            # User Auth & JWT Token Provider (:8081)
-│   ├── category-service/        # Expense Categories Management (:8082)
-│   ├── expense-service/         # Expense Tracking & Feign Client (:8083)
-│   └── report-service/          # Analytics & Financial Aggregation (:8084)
+├── Authentication
+│   ├── Register
+│   ├── Login
+│   └── JWT Authentication
 │
-├── database/                     # SQL Schemas (Database-per-Service)
-│   ├── auth-db.sql
-│   ├── category-db.sql
-│   ├── expense-db.sql
-│   └── report-db.sql
+├── Dashboard
+│   ├── Monthly Salary / Inflows
+│   ├── Total Expenses
+│   ├── Total Savings
+│   ├── Savings Rate (%)
+│   └── Financial Overview & Stock Market Trajectory
 │
-├── docker/                       # Containerization & Deployment
-│   ├── docker-compose.yml
-│   └── README.md
+├── Income
+│   ├── Log Monthly Salary
+│   ├── Freelance / Returns / Dividends
+│   └── Inflow History & CSV/JSON Export
 │
-├── testing/                      # Postman & Test Matrices
-│   ├── postman/
-│   └── test-cases/
+├── Expenses
+│   ├── Add Expense
+│   ├── Edit Expense
+│   ├── Delete Expense
+│   └── Expense History & Receipt Preview
 │
-├── docs/                         # B.Tech Project Documentation & Diagrams
-│   ├── architecture/
-│   ├── database/
-│   ├── api-documentation/
-│   └── project-report/
+├── Categories
+│   ├── Food
+│   ├── Travel
+│   ├── Shopping
+│   ├── Bills
+│   ├── Education
+│   ├── Entertainment
+│   └── Custom Categories
 │
-├── .gitignore
-└── README.md
+├── Budget
+│   ├── Set Monthly Budget
+│   ├── Track Spending Headroom
+│   └── Budget Threshold Alerts
+│
+└── Reports
+    ├── Executive Cashflow Statement
+    ├── Income vs. Expense Trajectory
+    ├── Category-wise Expenses Audit
+    ├── Savings Trend
+    └── Print PDF / CSV / JSON Statements
 ```
 
 ---
 
-## ⚡ Quick Start Guide
+## 🛠️ Quick Start
 
-### 1. Database Setup
-Execute the scripts in the `database/` folder in your MySQL server:
-```sql
-SOURCE database/auth-db.sql;
-SOURCE database/category-db.sql;
-SOURCE database/expense-db.sql;
-SOURCE database/report-db.sql;
-```
+### 1. Database Setup (PostgreSQL)
+Ensure PostgreSQL is running on port `5432` with databases:
+* `spendwise_auth`
+* `spendwise_category`
+* `spendwise_expense`
+* `spendwise_report`
 
-### 2. Run Backend Services (In Order)
-1. **Eureka Server**:
-   ```bash
-   cd backend/eureka-server && mvn spring-boot:run
-   ```
-   *Dashboard available at http://localhost:8761*
-2. **Auth Service**:
-   ```bash
-   cd backend/auth-service && mvn spring-boot:run
-   ```
-3. **Category Service**:
-   ```bash
-   cd backend/category-service && mvn spring-boot:run
-   ```
-4. **Expense Service**:
-   ```bash
-   cd backend/expense-service && mvn spring-boot:run
-   ```
-5. **Report Service**:
-   ```bash
-   cd backend/report-service && mvn spring-boot:run
-   ```
-6. **API Gateway**:
-   ```bash
-   cd backend/api-gateway && mvn spring-boot:run
-   ```
+### 2. Start Microservices
+Run the Spring Boot services in this sequence:
+1. `backend/eureka-server` (`8761`)
+2. `backend/auth-service` (`8081`)
+3. `backend/category-service` (`8082`)
+4. `backend/transaction-service` (`8083`)
+5. `backend/report-service` (`8084`)
+6. `backend/api-gateway` (`8080`)
 
-### 3. Run Frontend
+### 3. Start Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Open **`http://localhost:5173`** in your browser.
-
----
-
-## 🐳 Docker Deployment
-To start all services, databases, and frontend containers in one command:
-```bash
-cd docker
-docker-compose up --build
-```
+Open **[http://localhost:5173](http://localhost:5173)** in your browser.

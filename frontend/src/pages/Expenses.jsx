@@ -4,13 +4,13 @@ import { categoryService } from '../services/categoryService';
 import { ExpenseTable } from '../components/ExpenseTable';
 import { ExpenseCard } from '../components/ExpenseCard';
 import { Modal } from '../components/Modal';
-import { 
-  Search, 
-  LayoutList, 
-  LayoutGrid, 
-  Plus, 
-  Calendar, 
-  DollarSign, 
+import {
+  Search,
+  LayoutList,
+  LayoutGrid,
+  Plus,
+  Calendar,
+  DollarSign,
   FileSpreadsheet,
   FileCode,
   ArrowUpDown,
@@ -50,11 +50,12 @@ export const Expenses = ({ onNavigateAddExpense }) => {
         categoryService.getAllCategories().catch(() => [])
       ]);
 
-      const expList = Array.isArray(expenseData) 
-        ? expenseData 
+      const rawList = Array.isArray(expenseData)
+        ? expenseData
         : (expenseData && Array.isArray(expenseData.content) ? expenseData.content : []);
-      const catList = Array.isArray(categoryData) 
-        ? categoryData 
+      const expList = rawList.filter(item => item.type !== 'INCOME');
+      const catList = Array.isArray(categoryData)
+        ? categoryData
         : (categoryData && Array.isArray(categoryData.content) ? categoryData.content : []);
 
       setExpenses(expList);
@@ -180,9 +181,9 @@ export const Expenses = ({ onNavigateAddExpense }) => {
       {/* Top Header Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: '700', color: '#0F172A' }}>Expense Ledger</h2>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: '700', color: '#0F172A' }}>Expense Tracker</h2>
           <p style={{ fontSize: '0.875rem', color: '#64748B' }}>
-            Filter, search, export, and manage your complete transaction history
+            Search, filter, export, and manage your daily expenses
           </p>
         </div>
 
@@ -245,25 +246,27 @@ export const Expenses = ({ onNavigateAddExpense }) => {
       {/* Summary Statistics Ribbon */}
       <div className="stats-ribbon">
         <div className="stat-item">
-          <span className="stat-label">Filtered Spending</span>
+          <span className="stat-label">Total Filtered Spend</span>
           <span className="stat-value" style={{ color: '#0F172A' }}>
             {formatCurrency(stats.total)}
           </span>
         </div>
         <div className="stat-item">
-          <span className="stat-label">Transactions</span>
-          <span className="stat-value">{stats.count} records</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Average Outflow</span>
-          <span className="stat-value" style={{ color: '#10B981' }}>
+          <span className="stat-label">Average Per Expense</span>
+          <span className="stat-value">
             {formatCurrency(stats.avg)}
           </span>
         </div>
         <div className="stat-item">
-          <span className="stat-label">Largest Expense</span>
-          <span className="stat-value" style={{ color: '#059669' }}>
+          <span className="stat-label">Biggest Expense</span>
+          <span className="stat-value" style={{ color: '#0F172A' }}>
             {formatCurrency(stats.max)}
+          </span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Expenses Count</span>
+          <span className="stat-value">
+            {stats.count} records
           </span>
         </div>
       </div>

@@ -8,9 +8,12 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
+import { Transactions } from './pages/Transactions';
+import { Income } from './pages/Income';
 import { Expenses } from './pages/Expenses';
 import { AddExpense } from './pages/AddExpense';
 import { Categories } from './pages/Categories';
+import { Analytics } from './pages/Analytics';
 import { Reports } from './pages/Reports';
 import { Profile } from './pages/Profile';
 
@@ -41,11 +44,21 @@ function MainLayout() {
       case 'dashboard':
         return (
           <Dashboard
-            onNavigateExpenses={() => setActivePage('expenses')}
+            onNavigateExpenses={() => setActivePage('transactions')}
+            onNavigateIncome={() => setActivePage('income')}
             onNavigateAddExpense={() => setActivePage('add-expense')}
             onNavigateCategories={() => setActivePage('categories')}
           />
         );
+      case 'transactions':
+        return (
+          <Transactions
+            onNavigateAddExpense={() => setActivePage('add-expense')}
+            onNavigateIncome={() => setActivePage('income')}
+          />
+        );
+      case 'income':
+        return <Income />;
       case 'expenses':
         return (
           <Expenses
@@ -61,8 +74,11 @@ function MainLayout() {
         );
       case 'categories':
         return <Categories />;
+      case 'analytics':
+        return <Analytics />;
       case 'reports':
         return <Reports />;
+      case 'settings':
       case 'profile':
         return <Profile />;
       default:
@@ -96,4 +112,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-

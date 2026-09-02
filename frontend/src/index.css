@@ -1,43 +1,67 @@
 /* ==========================================================
-   SpendWise - Clean Navy + Emerald FinTech Design System
+   FinTrack - Clean Navy + Emerald Green Design System
+   Palette: Deep Navy (#0F172A) + Emerald Green (#10B981)
    ========================================================== */
 
 :root {
   --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-heading: 'Outfit', 'Inter', sans-serif;
 
-  /* Primary Palette */
-  --navy-900: #0F172A;        /* Primary Deep Navy */
-  --navy-800: #1E293B;        /* Primary Light Slate Blue */
+  /* Primary Deep Navy & Slate Palette */
+  --primary: #0F172A;         /* Primary Deep Navy */
+  --navy-900: #0F172A;
+  --navy-800: #1E293B;        /* Slate Blue */
   --navy-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748B;
+  --slate-400: #94A3B8;
+  --slate-200: #E2E8F0;
+  --slate-100: #F1F5F9;
+  --slate-50: #F8FAFC;
   
-  --emerald-500: #10B981;     /* Accent Emerald Green */
-  --emerald-600: #059669;     /* Accent Dark Green */
-  --emerald-700: #047857;
+  /* Primary Accent: Emerald Green (#10B981) */
+  --accent: #10B981;          /* Emerald Green */
+  --accent-hover: #059669;    /* Dark Emerald */
+  --accent-active: #047857;
+  --accent-subtle: #ECFDF5;   /* Green 50 */
+  --accent-border: #A7F3D0;   /* Green 200 */
+  --emerald-500: #10B981;
+  --emerald-600: #059669;
 
-  --bg-main: #F8FAFC;         /* Background Off-White */
-  --bg-card: #FFFFFF;         /* Card White */
+  /* Neutrals: Background & Surface */
+  --bg-main: #F8FAFC;         /* Slate 50 */
+  --bg-card: #FFFFFF;         /* White Card */
   --bg-surface: #FFFFFF;
-  --bg-sidebar: #0F172A;      /* Sidebar Deep Navy */
-  --bg-navbar: #0F172A;       /* Navbar Deep Navy */
+  --bg-sidebar: #0F172A;      /* Deep Navy Sidebar */
+  --bg-navbar: #0F172A;       /* Deep Navy Header */
   --bg-modal: #FFFFFF;
 
-  --border-color: #E2E8F0;    /* Light Slate Border */
+  /* Borders */
+  --border-color: #E2E8F0;    /* Slate 200 */
   --border-color-hover: #CBD5E1;
   --border-focus: #10B981;
 
-  --text-primary: #0F172A;    /* Main Text Dark Slate */
-  --text-secondary: #64748B;  /* Slate Gray */
+  /* Typography */
+  --text-primary: #0F172A;    /* Slate 900 */
+  --text-secondary: #64748B;  /* Slate 500 */
   --text-muted: #94A3B8;
   --text-white: #FFFFFF;
   --text-nav: #94A3B8;
   --text-nav-active: #10B981;
 
-  /* Feedback Colors */
-  --success: #16A34A;
-  --warning: #F59E0B;
-  --danger: #DC2626;
-  --indigo: #4F46E5;
+  /* Semantic Feedback */
+  --success: #10B981;         /* Green */
+  --success-subtle: #ECFDF5;
+  --success-border: #A7F3D0;
+  --warning: #F59E0B;         /* Amber */
+  --warning-subtle: #FFFBEB;
+  --warning-border: #FDE68A;
+  --amber-500: #F59E0B;
+  --danger: #DC2626;          /* Red */
+  --danger-subtle: #FEF2F2;
+  --danger-border: #FECACA;
+  --rose-500: #DC2626;
+  --indigo: #6366F1;
 
   /* Shadows */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -45,7 +69,7 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 
-  /* Radius */
+  /* Radius & Transitions */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -143,10 +167,10 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-md);
 }
 
-/* Navbar */
+/* Header */
 .glass-header {
   background: var(--bg-navbar);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #1E293B;
   position: sticky;
   top: 0;
   z-index: 40;
@@ -171,16 +195,16 @@ h1, h2, h3, h4, h5, h6 {
   white-space: nowrap;
 }
 
-/* Primary Button: Solid Emerald Green */
+/* Primary Button: Solid Emerald Green (#10B981) */
 .btn-primary {
-  background: var(--emerald-500);
+  background: var(--accent);
   color: #FFFFFF;
-  border-color: var(--emerald-500);
+  border-color: var(--accent);
   box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
 }
 .btn-primary:hover {
-  background: var(--emerald-600);
-  border-color: var(--emerald-600);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
 }
@@ -243,7 +267,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
-  border-color: var(--emerald-500);
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
   background: #FFFFFF;
 }
@@ -293,28 +317,28 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.03em;
 }
 
-.badge-emerald {
+.badge-emerald, .badge-accent, .badge-success {
   background: #ECFDF5;
   color: #059669;
   border: 1px solid #A7F3D0;
+}
+
+.badge-amber, .badge-warning {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.badge-rose, .badge-danger {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
 }
 
 .badge-indigo {
   background: #EEF2FF;
   color: #4F46E5;
   border: 1px solid #C7D2FE;
-}
-
-.badge-rose {
-  background: #FEF2F2;
-  color: #DC2626;
-  border: 1px solid #FECACA;
-}
-
-.badge-amber {
-  background: #FFFBEB;
-  color: #D97706;
-  border: 1px solid #FDE68A;
 }
 
 /* Filter Pills */
@@ -340,9 +364,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .pill-btn.active {
-  background: var(--emerald-500);
+  background: var(--accent);
   color: #FFFFFF;
-  border-color: var(--emerald-500);
+  border-color: var(--accent);
   box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
 }
 
@@ -432,7 +456,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .receipt-dropzone:hover {
-  border-color: var(--emerald-500);
+  border-color: var(--accent);
   background: #ECFDF5;
 }
 

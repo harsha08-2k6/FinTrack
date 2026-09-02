@@ -12,11 +12,13 @@ public class ExpenseDto {
     private CategoryDto category;
     private Long userId;
     private LocalDate expenseDate;
+    private LocalDate transactionDate;
     private String paymentMethod;
+    private String type = "EXPENSE";
 
     public ExpenseDto() {}
 
-    public ExpenseDto(Long id, String title, String description, BigDecimal amount, Long categoryId, CategoryDto category, Long userId, LocalDate expenseDate, String paymentMethod) {
+    public ExpenseDto(Long id, String title, String description, BigDecimal amount, Long categoryId, CategoryDto category, Long userId, LocalDate expenseDate, String paymentMethod, String type) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -25,37 +27,9 @@ public class ExpenseDto {
         this.category = category;
         this.userId = userId;
         this.expenseDate = expenseDate;
+        this.transactionDate = expenseDate;
         this.paymentMethod = paymentMethod;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static class Builder {
-        private Long id;
-        private String title;
-        private String description;
-        private BigDecimal amount;
-        private Long categoryId;
-        private CategoryDto category;
-        private Long userId;
-        private LocalDate expenseDate;
-        private String paymentMethod;
-
-        public Builder id(Long id) { this.id = id; return this; }
-        public Builder title(String title) { this.title = title; return this; }
-        public Builder description(String description) { this.description = description; return this; }
-        public Builder amount(BigDecimal amount) { this.amount = amount; return this; }
-        public Builder categoryId(Long categoryId) { this.categoryId = categoryId; return this; }
-        public Builder category(CategoryDto category) { this.category = category; return this; }
-        public Builder userId(Long userId) { this.userId = userId; return this; }
-        public Builder expenseDate(LocalDate expenseDate) { this.expenseDate = expenseDate; return this; }
-        public Builder paymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; return this; }
-
-        public ExpenseDto build() {
-            return new ExpenseDto(id, title, description, amount, categoryId, category, userId, expenseDate, paymentMethod);
-        }
+        this.type = type != null ? type : "EXPENSE";
     }
 
     public Long getId() { return id; }
@@ -79,9 +53,23 @@ public class ExpenseDto {
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
 
-    public LocalDate getExpenseDate() { return expenseDate; }
-    public void setExpenseDate(LocalDate expenseDate) { this.expenseDate = expenseDate; }
+    public LocalDate getExpenseDate() { 
+        return expenseDate != null ? expenseDate : transactionDate; 
+    }
+    public void setExpenseDate(LocalDate expenseDate) { 
+        this.expenseDate = expenseDate; 
+        if (this.transactionDate == null) this.transactionDate = expenseDate;
+    }
+
+    public LocalDate getTransactionDate() { return getExpenseDate(); }
+    public void setTransactionDate(LocalDate transactionDate) { 
+        this.transactionDate = transactionDate; 
+        if (this.expenseDate == null) this.expenseDate = transactionDate;
+    }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getType() { return type != null ? type : "EXPENSE"; }
+    public void setType(String type) { this.type = type; }
 }

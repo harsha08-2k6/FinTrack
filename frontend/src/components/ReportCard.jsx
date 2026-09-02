@@ -61,10 +61,10 @@ export const MetricStatCard = ({
             display: 'flex',
             alignItems: 'center',
             gap: '2px',
-            color: isIncrease ? '#DC2626' : '#16A34A',
-            fontWeight: '600'
+            color: change < 0 ? '#DC2626' : '#16A34A',
+            fontWeight: '700'
           }}>
-            {isIncrease ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            {change < 0 ? <TrendingDown size={14} color="#DC2626" /> : <TrendingUp size={14} color="#16A34A" />}
             {formatPercentage(change)}
           </span>
         )}

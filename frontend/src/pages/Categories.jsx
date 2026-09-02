@@ -3,13 +3,13 @@ import { categoryService } from '../services/categoryService';
 import { reportService } from '../services/reportService';
 import { CategoryCard } from '../components/CategoryCard';
 import { Modal } from '../components/Modal';
-import { 
-  Plus, 
-  Tag, 
-  IndianRupee, 
-  Search, 
-  ShieldCheck, 
-  TrendingUp, 
+import {
+  Plus,
+  Tag,
+  IndianRupee,
+  Search,
+  ShieldCheck,
+  TrendingUp,
   PieChart
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -119,8 +119,8 @@ export const Categories = () => {
   const filteredCategories = useMemo(() => {
     if (!searchTerm.trim()) return categories;
     const term = searchTerm.toLowerCase();
-    return categories.filter(c => 
-      c.name.toLowerCase().includes(term) || 
+    return categories.filter(c =>
+      c.name.toLowerCase().includes(term) ||
       (c.description && c.description.toLowerCase().includes(term))
     );
   }, [categories, searchTerm]);
@@ -146,11 +146,11 @@ export const Categories = () => {
             Set category budget limits, track spending progress, and customize tags
           </p>
         </div>
-        <button 
+        <button
           onClick={() => {
             setFormData({ name: '', description: '', colorCode: '#10B981', budgetLimit: '' });
             setIsCreateModalOpen(true);
-          }} 
+          }}
           className="btn btn-primary"
         >
           <Plus size={16} />
@@ -202,7 +202,7 @@ export const Categories = () => {
         }}>
           <ShieldCheck size={20} color="#2563EB" style={{ flexShrink: 0 }} />
           <span>
-            <strong>Configure Your Budgets:</strong> No default limits are enforced. Click the <strong>edit icon (✏️)</strong> or <strong>+ Set Budget</strong> on any category below to assign your organization's custom monthly spending caps.
+            <strong>Configure Your Budgets:</strong> No default limits are enforced. Click the <strong>Edit action</strong> on any category card below to assign your organization's custom monthly spending caps.
           </span>
         </div>
       )}

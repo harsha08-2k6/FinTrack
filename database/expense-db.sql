@@ -15,7 +15,7 @@ CREATE TABLE expenses (
     user_id BIGINT NOT NULL,
     expense_date DATE NOT NULL,
     payment_method VARCHAR(50) DEFAULT 'CARD',
-    receipt_url VARCHAR(255) DEFAULT NULL,
+    receipt_url TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

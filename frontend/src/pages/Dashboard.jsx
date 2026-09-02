@@ -1,40 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { MetricStatCard } from '../components/ReportCard';
-import { ExpenseCard } from '../components/ExpenseCard';
+import { StockMarketChart } from '../components/StockMarketChart';
 import { Modal } from '../components/Modal';
 import { reportService } from '../services/reportService';
-import { expenseService } from '../services/expenseService';
+import { transactionService } from '../services/transactionService';
 import { categoryService } from '../services/categoryService';
 import { useAuth } from '../context/AuthContext';
 import { 
   CreditCard, 
   TrendingUp, 
+  TrendingDown,
   Calendar, 
   ArrowUpRight, 
-  ShieldAlert, 
   RefreshCw,
   Wallet,
   CheckCircle2,
   PieChart,
   IndianRupee,
   Receipt,
-  Sparkles,
-  PlusCircle,
+  Plus,
   Sliders,
   ArrowRight,
   ShieldCheck,
-  Tag
+  Tag,
+  Percent,
+  PiggyBank
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
+import { formatDate } from '../utils/formatDate';
 
-export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigateCategories }) => {
+export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigateIncome, onNavigateCategories }) => {
   const { user } = useAuth();
   const [report, setReport] = useState(null);
-  const [recentExpenses, setRecentExpenses] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Quick Income Modal State
+  const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+  const [incomeTitle, setIncomeTitle] = useState('Monthly Salary');
+  const [incomeAmount, setIncomeAmount] = useState('');
+  const [savingIncome, setSavingIncome] = useState(false);
 
   // Quick Budget Setup Modal State
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -43,24 +50,18 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
 
   const fetchDashboardData = async () => {
     try {
-      const [reportData, expensesData, alertsData, categoryData] = await Promise.all([
+      const [reportData, transactionsData, categoryData] = await Promise.all([
         reportService.getDashboardReport().catch(() => null),
-        expenseService.getExpenses({ size: 5 }).catch(() => []),
-        reportService.getBudgetAlerts().catch(() => []),
+        transactionService.getAllTransactions().catch(() => []),
         categoryService.getAllCategories().catch(() => [])
       ]);
 
       if (reportData) setReport(reportData);
 
-      const expList = Array.isArray(expensesData) 
-        ? expensesData 
-        : (expensesData && Array.isArray(expensesData.content) ? expensesData.content : []);
-      setRecentExpenses(expList);
-
-      const alertList = Array.isArray(alertsData) 
-        ? alertsData 
-        : (alertsData && Array.isArray(alertsData.content) ? alertsData.content : []);
-      setAlerts(alertList);
+      const txList = Array.isArray(transactionsData) 
+        ? transactionsData 
+        : (transactionsData && Array.isArray(transactionsData.content) ? transactionsData.content : []);
+      setRecentTransactions(txList.slice(0, 5));
 
       const catList = Array.isArray(categoryData) 
         ? categoryData 
@@ -83,16 +84,27 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
     fetchDashboardData();
   };
 
-  const handleDeleteExpense = async (id) => {
+  const handleQuickSaveIncome = async (e) => {
+    e.preventDefault();
+    if (!incomeAmount || parseFloat(incomeAmount) <= 0) return;
+    setSavingIncome(true);
     try {
-      await expenseService.deleteExpense(id);
+      await transactionService.createIncome({
+        title: incomeTitle.trim(),
+        amount: parseFloat(incomeAmount),
+        paymentMethod: 'BANK_TRANSFER',
+        transactionDate: new Date().toISOString().split('T')[0]
+      });
+      setIsIncomeModalOpen(false);
+      setIncomeAmount('');
       fetchDashboardData();
     } catch (err) {
-      alert('Failed to delete expense: ' + err.message);
+      alert('Failed to log income: ' + err.message);
+    } finally {
+      setSavingIncome(false);
     }
   };
 
-  // Open Quick Budget Modal
   const handleOpenBudgetModal = () => {
     const initial = {};
     categories.forEach(cat => {
@@ -104,10 +116,6 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
 
   const handleBudgetChange = (catId, value) => {
     setBudgetInputs(prev => ({ ...prev, [catId]: value }));
-  };
-
-  const handleApplyPreset = (catId, amount) => {
-    setBudgetInputs(prev => ({ ...prev, [catId]: amount.toString() }));
   };
 
   const handleSaveAllBudgets = async (e) => {
@@ -139,37 +147,38 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
     return (
       <div className="page-wrapper" style={{ textAlign: 'center', padding: '4rem 1rem' }}>
         <div style={{ width: '36px', height: '36px', border: '3px solid #E2E8F0', borderTopColor: '#10B981', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1.5rem auto' }}></div>
-        <p style={{ color: '#64748B', fontWeight: '500' }}>Loading financial overview...</p>
+        <p style={{ color: '#64748B', fontWeight: '500' }}>Loading your dashboard...</p>
       </div>
     );
   }
 
+  // Calculate 4 Core Pillars
   const currentMonthSpend = report?.currentMonthSpend || 0;
-  const totalAllTime = report?.totalSpendAllTime || 0;
-  const totalTransactions = report?.totalTransactions || recentExpenses.length;
+  const currentMonthIncome = report?.currentMonthIncome || 0;
+  const totalAllTimeSpend = report?.totalSpendAllTime || 0;
+  const totalAllTimeIncome = report?.totalIncomeAllTime || 0;
+  
+  const currentMonthSavings = currentMonthIncome - currentMonthSpend;
+  const savingsRate = currentMonthIncome > 0 ? (currentMonthSavings / currentMonthIncome) * 100 : 0;
+  
   const momChange = report?.monthOverMonthChangePercentage;
   const breakdowns = report?.categoryBreakdowns || [];
-
-  // Calculate Total Budget and Budget Remaining using the same spend source as budget tracking.
-  const totalBudgetLimit = categories.reduce((sum, c) => sum + (parseFloat(c.budgetLimit) || 0), 0);
-  const countWithBudget = categories.filter(c => parseFloat(c.budgetLimit) > 0).length;
-  const breakdownSpend = breakdowns.reduce((sum, cat) => sum + (parseFloat(cat.totalAmount) || 0), 0);
-  const budgetSpendBase = breakdownSpend > 0 ? breakdownSpend : currentMonthSpend;
-  const budgetRemaining = totalBudgetLimit > 0 ? totalBudgetLimit - budgetSpendBase : 0;
-
-  const previewTotalBudget = Object.values(budgetInputs).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+  const monthlyTrends = report?.monthlyTrends || [];
 
   return (
     <div className="page-wrapper">
-      {/* Top Banner / Actions */}
+      {/* Top Banner & Quick Actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: '700', color: '#0F172A' }}>Financial Overview</h2>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.02em' }}>
+            Financial Overview
+          </h2>
           <p style={{ fontSize: '0.875rem', color: '#64748B' }}>
-            Real-time analytics and transaction telemetry from FinTrack corporate microservices
+            Track your monthly salary, daily expenses, and savings goals
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
             onClick={handleRefresh}
             className="btn btn-secondary"
@@ -177,200 +186,123 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
             disabled={refreshing}
           >
             <RefreshCw size={15} className={refreshing ? 'spin-anim' : ''} />
-            <span>Refresh Data</span>
+            <span>Refresh</span>
+          </button>
+
+          <button
+            onClick={() => setIsIncomeModalOpen(true)}
+            className="btn btn-secondary"
+            style={{ borderColor: '#A7F3D0', color: '#059669', background: '#ECFDF5' }}
+          >
+            <Plus size={15} />
+            <span>Log Income</span>
+          </button>
+
+          <button
+            onClick={onNavigateAddExpense}
+            className="btn btn-primary"
+          >
+            <Plus size={15} />
+            <span>Add Expense</span>
           </button>
         </div>
       </div>
 
-      {/* Budget Alerts Banner */}
-      {alerts.length > 0 && (
-        <div style={{
-          background: '#FEF2F2',
-          border: '1px solid #FECACA',
-          borderRadius: '12px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.75rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem'
-        }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            background: '#FEE2E2',
-            color: '#DC2626',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <ShieldAlert size={18} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#991B1B' }}>
-              {alerts[0].title}
-            </h4>
-            <p style={{ fontSize: '0.8rem', color: '#B91C1C' }}>
-              {alerts[0].message}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* User-Friendly First-Time Budget Setup Hero (Only shown when 0 Budgets Defined) */}
-      {totalBudgetLimit === 0 && (
-        <div style={{
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-          padding: '1.75rem 2rem',
-          color: '#FFFFFF',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1.5rem'
-        }}>
-          <div style={{ maxWidth: '600px' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.25rem 0.65rem',
-              borderRadius: '20px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              color: '#10B981',
-              fontSize: '0.75rem',
-              fontWeight: '700',
-              marginBottom: '0.65rem'
-            }}>
-              <Sliders size={13} /> STEP 1: SET MONTHLY BUDGETS
-            </div>
-            <h3 style={{ fontSize: '1.35rem', fontWeight: '700', color: '#FFFFFF', marginBottom: '0.35rem' }}>
-              Set Your Corporate Category Budgets 🎯
-            </h3>
-            <p style={{ color: '#94A3B8', fontSize: '0.85rem', lineHeight: '1.5' }}>
-              Define spending limits for your departments & categories (Food, Travel, Software, Bills) to activate real-time budget tracking, safe limits, and automated headroom alerts.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleOpenBudgetModal}
-              className="btn btn-primary"
-              style={{
-                padding: '0.7rem 1.3rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem'
-              }}
-            >
-              <Sliders size={16} />
-              <span>Quick Set Budgets</span>
-            </button>
-            {onNavigateCategories && (
-              <button
-                onClick={onNavigateCategories}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#F8FAFC',
-                  padding: '0.7rem 1.1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  transition: 'var(--transition)'
-                }}
-              >
-                <span>Manage in Categories</span>
-                <ArrowRight size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Key Metric Stat Cards Matching Specified Palette */}
+      {/* 4 CORE FINANCIAL PILLARS */}
       <div className="grid-4" style={{ marginBottom: '2rem' }}>
-        {/* Total Expenses (#0F172A) */}
+        {/* Pillar 1: Monthly Income */}
+        <MetricStatCard
+          title="Monthly Income"
+          value={currentMonthIncome > 0 ? currentMonthIncome : (totalAllTimeIncome > 0 ? totalAllTimeIncome : 0)}
+          subtext={currentMonthIncome > 0 ? "Total money in this month" : "Click 'Log Income' above"}
+          icon={Wallet}
+          valueColor="#10B981"
+          iconBg="#ECFDF5"
+          iconColor="#10B981"
+        />
+
+        {/* Pillar 2: Total Expenses */}
         <MetricStatCard
           title="Total Expenses"
-          value={totalAllTime}
-          subtext={`${totalTransactions} total transactions`}
-          icon={Wallet}
+          value={currentMonthSpend}
+          change={momChange}
+          subtext="Total money spent this month"
+          icon={CreditCard}
           valueColor="#0F172A"
           iconBg="#F1F5F9"
           iconColor="#0F172A"
         />
 
-        {/* Monthly Spending (#10B981) */}
+        {/* Pillar 3: Total Savings */}
         <MetricStatCard
-          title="Monthly Spending"
-          value={currentMonthSpend}
-          change={momChange}
-          subtext="Current calendar month"
-          icon={CreditCard}
-          valueColor="#10B981"
-          iconBg="#ECFDF5"
-          iconColor="#059669"
+          title="Total Savings"
+          value={currentMonthIncome > 0 ? currentMonthSavings : (totalAllTimeIncome > 0 ? (totalAllTimeIncome - totalAllTimeSpend) : 0)}
+          subtext={currentMonthSavings >= 0 ? "Money saved this month" : "Spent more than earned"}
+          icon={PiggyBank}
+          valueColor={currentMonthSavings >= 0 ? "#10B981" : "#DC2626"}
+          iconBg={currentMonthSavings >= 0 ? "#ECFDF5" : "#FEF2F2"}
+          iconColor={currentMonthSavings >= 0 ? "#10B981" : "#DC2626"}
         />
 
-        {/* Budget Remaining */}
+        {/* Pillar 4: Savings Rate */}
         <MetricStatCard
-          title="Budget Remaining"
-          value={totalBudgetLimit > 0 ? budgetRemaining : 'Unset'}
-          subtext={totalBudgetLimit > 0 ? `of ${formatCurrency(totalBudgetLimit)} budget` : 'Click Quick Set above'}
-          icon={CheckCircle2}
-          valueColor={totalBudgetLimit > 0 ? '#059669' : '#0F172A'}
-          iconBg={totalBudgetLimit > 0 ? '#ECFDF5' : '#F1F5F9'}
-          iconColor={totalBudgetLimit > 0 ? '#059669' : '#64748B'}
-        />
-
-        {/* Top Category */}
-        <MetricStatCard
-          title="Top Spending Category"
-          value={(report?.totalSpendAllTime > 0 && report?.topSpendingCategory && report.topSpendingCategory !== 'None') ? report.topSpendingCategory : 'None yet'}
-          subtext={report?.totalSpendAllTime > 0 ? formatCurrency(report?.topSpendingCategoryAmount || 0) : 'No transactions recorded'}
-          icon={TrendingUp}
-          valueColor="#0F172A"
-          iconBg="#EEF2FF"
-          iconColor="#4F46E5"
+          title="Savings Rate"
+          value={currentMonthIncome > 0 ? `${savingsRate.toFixed(1)}%` : "0.0%"}
+          subtext={savingsRate >= 20 ? "Great job! Target reached (≥ 20%)" : "Target: 20% or higher"}
+          icon={Percent}
+          valueColor={savingsRate >= 20 ? "#10B981" : (savingsRate > 0 ? "#D97706" : "#0F172A")}
+          iconBg={savingsRate >= 20 ? "#ECFDF5" : "#F1F5F9"}
+          iconColor={savingsRate >= 20 ? "#10B981" : "#64748B"}
         />
       </div>
 
-      {/* Main Breakdown Section */}
-      <div className="grid-2" style={{ marginBottom: '2rem', alignItems: 'start' }}>
-        {/* Category Breakdown Progress */}
-        <div className="card">
+      {/* Main Visuals Grid: Spending Trend & Category Share */}
+      <div className="grid-2" style={{ marginBottom: '2rem', gridTemplateColumns: '1.4fr 1fr' }}>
+        {/* Stock Market Area Chart */}
+        <div className="card" style={{ padding: '1.75rem', background: '#FFFFFF' }}>
+          <StockMarketChart 
+            data={monthlyTrends} 
+            title="Monthly Spending Trend"
+            subtext="Interactive timeline showing your monthly spending habits"
+            height={240}
+          />
+        </div>
+
+        {/* Category Budget & Spending Breakdown */}
+        <div className="card" style={{ padding: '1.75rem', background: '#FFFFFF' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
             <div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F172A' }}>Spending by Category</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Outflow distribution across categories</p>
+              <p style={{ fontSize: '0.75rem', color: '#64748B' }}>How your money is divided across categories</p>
             </div>
-            <span className="badge badge-emerald">{breakdowns.length} Categories</span>
+            <button 
+              onClick={handleOpenBudgetModal}
+              style={{
+                background: '#F1F5F9',
+                border: '1px solid #E2E8F0',
+                color: '#0F172A',
+                padding: '0.3rem 0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Set Budgets
+            </button>
           </div>
 
           {breakdowns.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#F8FAFC', borderRadius: '10px', border: '1px dashed #E2E8F0' }}>
               <p style={{ color: '#64748B', fontSize: '0.85rem' }}>
-                No category metrics recorded yet. Log expenses to view breakdown.
+                No category expenses recorded yet. Add an expense to see breakdown.
               </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-              {breakdowns.map((cat) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              {breakdowns.slice(0, 5).map((cat) => (
                 <div key={cat.categoryId}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
                     <span style={{ fontWeight: '600', color: '#0F172A' }}>{cat.categoryName}</span>
                     <span style={{ color: '#64748B' }}>
                       <strong style={{ color: '#0F172A' }}>{formatCurrency(cat.totalAmount)}</strong> ({cat.percentage?.toFixed(1)}%)
@@ -380,8 +312,8 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
                     <div
                       className="progress-bar-fill"
                       style={{
-                        width: `${Math.min(cat.percentage || 0, 100)}%`,
-                        background: cat.colorCode || '#10B981'
+                        width: `${Math.min(100, Math.max(2, cat.percentage))}%`,
+                        background: cat.overBudget ? '#DC2626' : (cat.colorCode || '#10B981')
                       }}
                     />
                   </div>
@@ -390,180 +322,161 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
             </div>
           )}
         </div>
-
-        {/* Recent Transactions List */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F172A' }}>Recent Transactions</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Latest captured ledger records</p>
-            </div>
-            <button
-              onClick={onNavigateExpenses}
-              className="btn btn-secondary"
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
-            >
-              <span>View All</span>
-              <ArrowUpRight size={14} />
-            </button>
-          </div>
-
-          {recentExpenses.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#F8FAFC', borderRadius: '10px', border: '1px dashed #E2E8F0' }}>
-              <Receipt size={32} color="#10B981" style={{ margin: '0 auto 0.75rem auto' }} />
-              <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0F172A', marginBottom: '0.25rem' }}>
-                No Transactions Recorded
-              </h4>
-              <p style={{ color: '#64748B', fontSize: '0.8rem', maxWidth: '320px', margin: '0 auto 1.25rem auto' }}>
-                Start tracking your outflow to populate analytics and monitor monthly category budgets.
-              </p>
-              <button className="btn btn-primary" onClick={onNavigateAddExpense} style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
-                + Record First Expense
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {recentExpenses.slice(0, 4).map((exp) => (
-                <ExpenseCard
-                  key={exp.id}
-                  expense={exp}
-                  onDelete={handleDeleteExpense}
-                />
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Quick Set Category Budgets Modal */}
-      <Modal
-        isOpen={isBudgetModalOpen}
-        onClose={() => setIsBudgetModalOpen(false)}
-        title="Set Category Monthly Budgets"
-      >
-        <form onSubmit={handleSaveAllBudgets}>
-          <p style={{ fontSize: '0.85rem', color: '#64748B', marginBottom: '1.25rem' }}>
-            Enter your monthly spending limit for each corporate category. Leave blank or 0 for unbudgeted categories.
-          </p>
+      {/* Recent Transactions Stream */}
+      <div className="card" style={{ padding: '1.75rem', background: '#FFFFFF', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F172A' }}>Recent Transactions</h3>
+            <p style={{ fontSize: '0.78rem', color: '#64748B' }}>Latest income deposits and expenses</p>
+          </div>
+          {onNavigateExpenses && (
+            <button onClick={onNavigateExpenses} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
+              <span>View All</span>
+              <ArrowRight size={13} />
+            </button>
+          )}
+        </div>
 
-          <div style={{ maxHeight: '380px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-            {categories.map((cat) => {
-              const currentVal = budgetInputs[cat.id] || '';
+        {recentTransactions.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', color: '#94A3B8', textAlign: 'center', padding: '1.5rem 0' }}>
+            No transactions yet. Click <strong>+ Log Income</strong> or <strong>+ Add Expense</strong> to get started.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {recentTransactions.map(tx => {
+              const isIncome = tx.type === 'INCOME';
               return (
-                <div 
-                  key={cat.id}
+                <div
+                  key={tx.id}
                   style={{
-                    padding: '0.85rem 1rem',
-                    background: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '0.75rem'
+                    padding: '0.75rem 1rem',
+                    background: '#F8FAFC',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
                       width: '32px',
                       height: '32px',
-                      borderRadius: '8px',
-                      background: `${cat.colorCode || '#10B981'}18`,
-                      border: `1px solid ${cat.colorCode || '#10B981'}40`,
+                      borderRadius: '7px',
+                      background: isIncome ? '#ECFDF5' : '#F1F5F9',
+                      color: isIncome ? '#10B981' : '#0F172A',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      color: cat.colorCode || '#10B981'
+                      justifyContent: 'center'
                     }}>
-                      <Tag size={15} />
+                      {isIncome ? <TrendingUp size={16} /> : <CreditCard size={16} />}
                     </div>
                     <div>
-                      <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#0F172A' }}>{cat.name}</div>
-                      <div style={{ fontSize: '0.725rem', color: '#64748B' }}>{cat.description || 'Corporate category'}</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0F172A' }}>{tx.title}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                        {formatDate(tx.transactionDate || tx.expenseDate)} • {tx.paymentMethod || 'CARD'}
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ position: 'relative', width: '130px' }}>
-                      <input
-                        type="number"
-                        step="100"
-                        min="0"
-                        placeholder="0.00"
-                        value={currentVal}
-                        onChange={(e) => handleBudgetChange(cat.id, e.target.value)}
-                        className="form-input"
-                        style={{ paddingLeft: '1.75rem', fontSize: '0.85rem', fontWeight: '600' }}
-                      />
-                      <IndianRupee size={13} color="#64748B" style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      fontSize: '0.95rem',
+                      fontWeight: '800',
+                      color: isIncome ? '#10B981' : '#0F172A'
+                    }}>
+                      {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
                     </div>
-
-                    {/* Quick Presets */}
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                      {[1000, 3000, 5000].map(amt => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => handleApplyPreset(cat.id, amt)}
-                          style={{
-                            padding: '0.25rem 0.45rem',
-                            background: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
-                            fontWeight: '600',
-                            color: '#334155',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          +₹{amt / 1000}k
-                        </button>
-                      ))}
-                    </div>
+                    <span className="badge" style={{
+                      fontSize: '0.65rem',
+                      background: isIncome ? '#ECFDF5' : '#F1F5F9',
+                      color: isIncome ? '#059669' : '#475569',
+                      borderColor: isIncome ? '#A7F3D0' : '#CBD5E1'
+                    }}>
+                      {isIncome ? 'INCOME' : (tx.category?.name || 'EXPENSE')}
+                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
+        )}
+      </div>
 
-          {/* Total Budget Summary Footer */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0.85rem 1.25rem',
-            background: '#ECFDF5',
-            border: '1px solid #A7F3D0',
-            borderRadius: '10px',
-            marginBottom: '1.5rem'
-          }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: '#065F46', fontWeight: '600' }}>TOTAL MONTHLY ALLOCATION</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#047857' }}>
-                {formatCurrency(previewTotalBudget)}
-              </div>
-            </div>
-            <span style={{ fontSize: '0.8rem', color: '#059669', fontWeight: '500' }}>
-              Calculates dynamic headroom automatically
-            </span>
+      {/* Quick Salary Log Modal */}
+      <Modal isOpen={isIncomeModalOpen} onClose={() => setIsIncomeModalOpen(false)} title="Log Income or Salary">
+        <form onSubmit={handleQuickSaveIncome}>
+          <div className="form-group">
+            <label className="form-label">Income Source / Title</label>
+            <input
+              type="text"
+              required
+              className="form-input"
+              value={incomeTitle}
+              onChange={(e) => setIncomeTitle(e.target.value)}
+              placeholder="e.g. Monthly Salary, Freelance project"
+            />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={() => setIsBudgetModalOpen(false)}
-              className="btn btn-secondary"
-            >
+          <div className="form-group">
+            <label className="form-label">Amount (₹) *</label>
+            <input
+              type="number"
+              required
+              min="1"
+              step="0.01"
+              className="form-input"
+              value={incomeAmount}
+              onChange={(e) => setIncomeAmount(e.target.value)}
+              placeholder="e.g. 75000"
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsIncomeModalOpen(false)}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={savingBudgets}
-              className="btn btn-primary"
-              style={{ minWidth: '150px' }}
-            >
-              {savingBudgets ? 'Applying Limits...' : 'Save & Apply Budgets'}
+            <button type="submit" disabled={savingIncome} className="btn btn-primary">
+              {savingIncome ? 'Saving...' : 'Save Income'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Quick Budget Configuration Modal */}
+      <Modal isOpen={isBudgetModalOpen} onClose={() => setIsBudgetModalOpen(false)} title="Set Category Monthly Budgets">
+        <form onSubmit={handleSaveAllBudgets}>
+          <p style={{ color: '#64748B', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            Assign monthly spending limits to your categories to keep your expenses under control.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '55vh', overflowY: 'auto' }}>
+            {categories.map((cat) => (
+              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.75rem 1rem', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <span style={{ fontWeight: '600', color: '#0F172A', fontSize: '0.875rem' }}>{cat.name}</span>
+                <div style={{ width: '150px' }}>
+                  <input
+                    type="number"
+                    step="100"
+                    placeholder="e.g. 5000"
+                    className="form-input"
+                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
+                    value={budgetInputs[cat.id] || ''}
+                    onChange={(e) => handleBudgetChange(cat.id, e.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsBudgetModalOpen(false)}>
+              Cancel
+            </button>
+            <button type="submit" disabled={savingBudgets} className="btn btn-primary">
+              {savingBudgets ? 'Saving...' : 'Save Budgets'}
             </button>
           </div>
         </form>

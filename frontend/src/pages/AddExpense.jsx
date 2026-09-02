@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { expenseService } from '../services/expenseService';
 import { categoryService } from '../services/categoryService';
-import { 
-  PlusCircle, 
-  IndianRupee, 
-  Calendar, 
-  Tag, 
-  CreditCard, 
-  FileText, 
-  CheckCircle2, 
+import {
+  PlusCircle,
+  IndianRupee,
+  Calendar,
+  Tag,
+  CreditCard,
+  FileText,
+  CheckCircle2,
   AlertCircle,
   Paperclip,
   Image as ImageIcon,
@@ -133,7 +133,7 @@ export const AddExpense = ({ onSuccess, onCancel }) => {
             <div>
               <h2 style={{ fontSize: '1.4rem', fontWeight: '700', color: '#0F172A' }}>Record New Expense</h2>
               <p style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                Dispatches transaction to Expense Microservice & syncs Analytics
+                Enter your expense amount, category, and payment method
               </p>
             </div>
           </div>

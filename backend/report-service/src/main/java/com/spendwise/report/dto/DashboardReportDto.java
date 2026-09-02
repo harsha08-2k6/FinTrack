@@ -15,52 +15,16 @@ public class DashboardReportDto {
     private List<CategoryBreakdownDto> categoryBreakdowns;
     private List<MonthlyTrendDto> monthlyTrends;
 
+    // Income & Savings Pillars
+    private BigDecimal totalIncomeAllTime;
+    private BigDecimal currentMonthIncome;
+    private BigDecimal totalSavings;
+    private BigDecimal currentMonthSavings;
+    private Double savingsRate;
+    private List<MonthlyTrendDto> incomeTrends;
+    private List<MonthlyTrendDto> savingsTrends;
+
     public DashboardReportDto() {}
-
-    public DashboardReportDto(BigDecimal totalSpendAllTime, BigDecimal currentMonthSpend, BigDecimal previousMonthSpend, Double monthOverMonthChangePercentage, Integer totalTransactions, BigDecimal averageDailySpend, String topSpendingCategory, BigDecimal topSpendingCategoryAmount, List<CategoryBreakdownDto> categoryBreakdowns, List<MonthlyTrendDto> monthlyTrends) {
-        this.totalSpendAllTime = totalSpendAllTime;
-        this.currentMonthSpend = currentMonthSpend;
-        this.previousMonthSpend = previousMonthSpend;
-        this.monthOverMonthChangePercentage = monthOverMonthChangePercentage;
-        this.totalTransactions = totalTransactions;
-        this.averageDailySpend = averageDailySpend;
-        this.topSpendingCategory = topSpendingCategory;
-        this.topSpendingCategoryAmount = topSpendingCategoryAmount;
-        this.categoryBreakdowns = categoryBreakdowns;
-        this.monthlyTrends = monthlyTrends;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static class Builder {
-        private BigDecimal totalSpendAllTime;
-        private BigDecimal currentMonthSpend;
-        private BigDecimal previousMonthSpend;
-        private Double monthOverMonthChangePercentage;
-        private Integer totalTransactions;
-        private BigDecimal averageDailySpend;
-        private String topSpendingCategory;
-        private BigDecimal topSpendingCategoryAmount;
-        private List<CategoryBreakdownDto> categoryBreakdowns;
-        private List<MonthlyTrendDto> monthlyTrends;
-
-        public Builder totalSpendAllTime(BigDecimal totalSpendAllTime) { this.totalSpendAllTime = totalSpendAllTime; return this; }
-        public Builder currentMonthSpend(BigDecimal currentMonthSpend) { this.currentMonthSpend = currentMonthSpend; return this; }
-        public Builder previousMonthSpend(BigDecimal previousMonthSpend) { this.previousMonthSpend = previousMonthSpend; return this; }
-        public Builder monthOverMonthChangePercentage(Double monthOverMonthChangePercentage) { this.monthOverMonthChangePercentage = monthOverMonthChangePercentage; return this; }
-        public Builder totalTransactions(Integer totalTransactions) { this.totalTransactions = totalTransactions; return this; }
-        public Builder averageDailySpend(BigDecimal averageDailySpend) { this.averageDailySpend = averageDailySpend; return this; }
-        public Builder topSpendingCategory(String topSpendingCategory) { this.topSpendingCategory = topSpendingCategory; return this; }
-        public Builder topSpendingCategoryAmount(BigDecimal topSpendingCategoryAmount) { this.topSpendingCategoryAmount = topSpendingCategoryAmount; return this; }
-        public Builder categoryBreakdowns(List<CategoryBreakdownDto> categoryBreakdowns) { this.categoryBreakdowns = categoryBreakdowns; return this; }
-        public Builder monthlyTrends(List<MonthlyTrendDto> monthlyTrends) { this.monthlyTrends = monthlyTrends; return this; }
-
-        public DashboardReportDto build() {
-            return new DashboardReportDto(totalSpendAllTime, currentMonthSpend, previousMonthSpend, monthOverMonthChangePercentage, totalTransactions, averageDailySpend, topSpendingCategory, topSpendingCategoryAmount, categoryBreakdowns, monthlyTrends);
-        }
-    }
 
     public BigDecimal getTotalSpendAllTime() { return totalSpendAllTime; }
     public void setTotalSpendAllTime(BigDecimal totalSpendAllTime) { this.totalSpendAllTime = totalSpendAllTime; }
@@ -91,4 +55,25 @@ public class DashboardReportDto {
 
     public List<MonthlyTrendDto> getMonthlyTrends() { return monthlyTrends; }
     public void setMonthlyTrends(List<MonthlyTrendDto> monthlyTrends) { this.monthlyTrends = monthlyTrends; }
+
+    public BigDecimal getTotalIncomeAllTime() { return totalIncomeAllTime; }
+    public void setTotalIncomeAllTime(BigDecimal totalIncomeAllTime) { this.totalIncomeAllTime = totalIncomeAllTime; }
+
+    public BigDecimal getCurrentMonthIncome() { return currentMonthIncome; }
+    public void setCurrentMonthIncome(BigDecimal currentMonthIncome) { this.currentMonthIncome = currentMonthIncome; }
+
+    public BigDecimal getTotalSavings() { return totalSavings; }
+    public void setTotalSavings(BigDecimal totalSavings) { this.totalSavings = totalSavings; }
+
+    public BigDecimal getCurrentMonthSavings() { return currentMonthSavings; }
+    public void setCurrentMonthSavings(BigDecimal currentMonthSavings) { this.currentMonthSavings = currentMonthSavings; }
+
+    public Double getSavingsRate() { return savingsRate; }
+    public void setSavingsRate(Double savingsRate) { this.savingsRate = savingsRate; }
+
+    public List<MonthlyTrendDto> getIncomeTrends() { return incomeTrends; }
+    public void setIncomeTrends(List<MonthlyTrendDto> incomeTrends) { this.incomeTrends = incomeTrends; }
+
+    public List<MonthlyTrendDto> getSavingsTrends() { return savingsTrends; }
+    public void setSavingsTrends(List<MonthlyTrendDto> savingsTrends) { this.savingsTrends = savingsTrends; }
 }

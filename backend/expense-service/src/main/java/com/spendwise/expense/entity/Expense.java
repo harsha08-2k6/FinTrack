@@ -37,7 +37,7 @@ public class Expense {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod = "CARD";
 
-    @Column(name = "receipt_url")
+    @Column(name = "receipt_url", columnDefinition = "TEXT")
     private String receiptUrl;
 
     @CreationTimestamp

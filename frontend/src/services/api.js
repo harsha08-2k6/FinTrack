@@ -3,7 +3,7 @@ import { getStoredToken, getStoredUser } from '../utils/tokenUtils';
 const BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || '';
 
 /**
- * Universal API request wrapper for SpendWise Gateway communication
+ * Universal API request wrapper for FinTrack Gateway communication
  */
 export async function apiRequest(endpoint, options = {}) {
   const token = getStoredToken();
@@ -45,3 +45,5 @@ export async function apiRequest(endpoint, options = {}) {
 
   return data;
 }
+
+export default apiRequest;

@@ -33,9 +33,22 @@ public class ReportService {
     }
 
     public DashboardReportDto getDashboardReport(Long userId) {
-        List<ExpenseDto> expenses = fetchExpensesForUser(userId);
+        List<ExpenseDto> allTransactions = fetchExpensesForUser(userId);
+
+        // Separate Income and Expenses
+        List<ExpenseDto> expenses = allTransactions.stream()
+                .filter(t -> !"INCOME".equalsIgnoreCase(t.getType()))
+                .collect(Collectors.toList());
+
+        List<ExpenseDto> incomeList = allTransactions.stream()
+                .filter(t -> "INCOME".equalsIgnoreCase(t.getType()))
+                .collect(Collectors.toList());
 
         BigDecimal totalSpendAllTime = expenses.stream()
+                .map(ExpenseDto::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalIncomeAllTime = incomeList.stream()
                 .map(ExpenseDto::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -50,6 +63,10 @@ public class ReportService {
                 .filter(e -> e.getExpenseDate() != null && YearMonth.from(e.getExpenseDate()).equals(prevYearMonth))
                 .collect(Collectors.toList());
 
+        List<ExpenseDto> currentMonthIncomeList = incomeList.stream()
+                .filter(e -> e.getExpenseDate() != null && YearMonth.from(e.getExpenseDate()).equals(currentYearMonth))
+                .collect(Collectors.toList());
+
         BigDecimal currentMonthSpend = currentMonthExpenses.stream()
                 .map(ExpenseDto::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -57,6 +74,25 @@ public class ReportService {
         BigDecimal prevMonthSpend = prevMonthExpenses.stream()
                 .map(ExpenseDto::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal currentMonthIncome = currentMonthIncomeList.stream()
+                .map(ExpenseDto::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Calculate Savings & Savings Rate
+        BigDecimal totalSavings = totalIncomeAllTime.subtract(totalSpendAllTime);
+        BigDecimal currentMonthSavings = currentMonthIncome.subtract(currentMonthSpend);
+
+        Double savingsRate = 0.0;
+        if (currentMonthIncome.compareTo(BigDecimal.ZERO) > 0) {
+            savingsRate = currentMonthSavings.divide(currentMonthIncome, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .doubleValue();
+        } else if (totalIncomeAllTime.compareTo(BigDecimal.ZERO) > 0) {
+            savingsRate = totalSavings.divide(totalIncomeAllTime, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .doubleValue();
+        }
 
         Double momChange = 0.0;
         if (prevMonthSpend.compareTo(BigDecimal.ZERO) > 0) {
@@ -73,6 +109,7 @@ public class ReportService {
 
         List<CategoryBreakdownDto> categoryBreakdowns = calculateCategoryBreakdown(expenses);
         List<MonthlyTrendDto> monthlyTrends = calculateMonthlyTrends(expenses);
+        List<MonthlyTrendDto> incomeTrends = calculateMonthlyTrends(incomeList);
 
         String topCatName = "None";
         BigDecimal topCatAmount = BigDecimal.ZERO;
@@ -82,32 +119,87 @@ public class ReportService {
             topCatAmount = top.getTotalAmount();
         }
 
-        return DashboardReportDto.builder()
-                .totalSpendAllTime(totalSpendAllTime)
-                .currentMonthSpend(currentMonthSpend)
-                .previousMonthSpend(prevMonthSpend)
-                .monthOverMonthChangePercentage(momChange)
-                .totalTransactions(expenses.size())
-                .averageDailySpend(avgDailySpend)
-                .topSpendingCategory(topCatName)
-                .topSpendingCategoryAmount(topCatAmount)
-                .categoryBreakdowns(categoryBreakdowns)
-                .monthlyTrends(monthlyTrends)
-                .build();
+        DashboardReportDto report = new DashboardReportDto();
+        report.setTotalSpendAllTime(totalSpendAllTime);
+        report.setCurrentMonthSpend(currentMonthSpend);
+        report.setPreviousMonthSpend(prevMonthSpend);
+        report.setMonthOverMonthChangePercentage(momChange);
+        report.setTotalTransactions(allTransactions.size());
+        report.setAverageDailySpend(avgDailySpend);
+        report.setTopSpendingCategory(topCatName);
+        report.setTopSpendingCategoryAmount(topCatAmount);
+        report.setCategoryBreakdowns(categoryBreakdowns);
+        report.setMonthlyTrends(monthlyTrends);
+
+        report.setTotalIncomeAllTime(totalIncomeAllTime);
+        report.setCurrentMonthIncome(currentMonthIncome);
+        report.setTotalSavings(totalSavings);
+        report.setCurrentMonthSavings(currentMonthSavings);
+        report.setSavingsRate(savingsRate);
+        report.setIncomeTrends(incomeTrends);
+
+        return report;
     }
 
     public List<CategoryBreakdownDto> getCategoryBreakdown(Long userId) {
-        List<ExpenseDto> expenses = fetchExpensesForUser(userId);
+        List<ExpenseDto> transactions = fetchExpensesForUser(userId);
+        List<ExpenseDto> expenses = transactions.stream()
+                .filter(t -> !"INCOME".equalsIgnoreCase(t.getType()))
+                .collect(Collectors.toList());
         return calculateCategoryBreakdown(expenses);
     }
 
     public List<MonthlyTrendDto> getMonthlyTrends(Long userId) {
-        List<ExpenseDto> expenses = fetchExpensesForUser(userId);
+        List<ExpenseDto> transactions = fetchExpensesForUser(userId);
+        List<ExpenseDto> expenses = transactions.stream()
+                .filter(t -> !"INCOME".equalsIgnoreCase(t.getType()))
+                .collect(Collectors.toList());
         return calculateMonthlyTrends(expenses);
     }
 
     public List<BudgetAlert> getBudgetAlerts(Long userId) {
-        return budgetAlertRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<CategoryBreakdownDto> breakdowns = getCategoryBreakdown(userId);
+        List<BudgetAlert> alerts = new ArrayList<>();
+
+        for (CategoryBreakdownDto b : breakdowns) {
+            BigDecimal limit = b.getBudgetLimit();
+            BigDecimal spent = b.getTotalAmount();
+
+            if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
+                if (b.isOverBudget()) {
+                    alerts.add(BudgetAlert.builder()
+                            .userId(userId)
+                            .alertType("CRITICAL")
+                            .title("Budget Exceeded: " + b.getCategoryName())
+                            .message(String.format("You have exceeded your budget for %s by ₹%.2f (%.1f%% used).",
+                                    b.getCategoryName(),
+                                    spent.subtract(limit).doubleValue(),
+                                    b.getPercentage()))
+                            .build());
+                } else if (b.getPercentage() >= 80.0) {
+                    alerts.add(BudgetAlert.builder()
+                            .userId(userId)
+                            .alertType("WARNING")
+                            .title("Approaching Budget: " + b.getCategoryName())
+                            .message(String.format("You have used %.1f%% of your %s budget (₹%.2f remaining).",
+                                    b.getPercentage(),
+                                    b.getCategoryName(),
+                                    limit.subtract(spent).doubleValue()))
+                            .build());
+                }
+            }
+        }
+        return alerts;
+    }
+
+    private List<ExpenseDto> fetchExpensesForUser(Long userId) {
+        try {
+            List<ExpenseDto> result = expenseClient.getAllExpenses(userId, null, null);
+            return result != null ? result : Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Failed to fetch transactions from transaction-service: {}", e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     private List<CategoryBreakdownDto> calculateCategoryBreakdown(List<ExpenseDto> expenses) {
@@ -119,93 +211,91 @@ public class ReportService {
                 .map(ExpenseDto::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Map<Long, List<ExpenseDto>> grouped = expenses.stream()
+        Map<Long, List<ExpenseDto>> byCategory = expenses.stream()
+                .filter(e -> e.getCategoryId() != null)
                 .collect(Collectors.groupingBy(ExpenseDto::getCategoryId));
 
-        List<CategoryBreakdownDto> result = new ArrayList<>();
+        List<CategoryBreakdownDto> list = new ArrayList<>();
 
-        for (Map.Entry<Long, List<ExpenseDto>> entry : grouped.entrySet()) {
+        for (Map.Entry<Long, List<ExpenseDto>> entry : byCategory.entrySet()) {
+            Long catId = entry.getKey();
             List<ExpenseDto> catExpenses = entry.getValue();
-            ExpenseDto sample = catExpenses.get(0);
 
-            BigDecimal sum = catExpenses.stream()
+            BigDecimal catTotal = catExpenses.stream()
                     .map(ExpenseDto::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            double percentage = 0.0;
-            if (totalSpend.compareTo(BigDecimal.ZERO) > 0) {
-                percentage = sum.divide(totalSpend, 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))
-                        .doubleValue();
+            String catName = "Unknown";
+            String colorCode = "#64748b";
+            BigDecimal budgetLimit = BigDecimal.ZERO;
+
+            if (!catExpenses.isEmpty() && catExpenses.get(0).getCategory() != null) {
+                CategoryDto cat = catExpenses.get(0).getCategory();
+                catName = cat.getName();
+                colorCode = cat.getColorCode() != null ? cat.getColorCode() : "#64748b";
+                budgetLimit = cat.getBudgetLimit() != null ? cat.getBudgetLimit() : BigDecimal.ZERO;
             }
 
-            String catName = sample.getCategory() != null ? sample.getCategory().getName() : "Category " + entry.getKey();
-            String color = sample.getCategory() != null && sample.getCategory().getColorCode() != null ? sample.getCategory().getColorCode() : "#6366f1";
-            String icon = sample.getCategory() != null && sample.getCategory().getIcon() != null ? sample.getCategory().getIcon() : "tag";
-            BigDecimal budget = sample.getCategory() != null && sample.getCategory().getBudgetLimit() != null ? sample.getCategory().getBudgetLimit() : BigDecimal.ZERO;
+            // Calculate percentage based on budget limit if defined, otherwise based on total spend
+            double percentage = 0.0;
+            if (budgetLimit.compareTo(BigDecimal.ZERO) > 0) {
+                percentage = catTotal.divide(budgetLimit, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue();
+            } else if (totalSpend.compareTo(BigDecimal.ZERO) > 0) {
+                percentage = catTotal.divide(totalSpend, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue();
+            }
 
-            boolean overBudget = budget.compareTo(BigDecimal.ZERO) > 0 && sum.compareTo(budget) > 0;
+            boolean overBudget = budgetLimit.compareTo(BigDecimal.ZERO) > 0 && catTotal.compareTo(budgetLimit) > 0;
 
-            result.add(CategoryBreakdownDto.builder()
-                    .categoryId(entry.getKey())
+            list.add(CategoryBreakdownDto.builder()
+                    .categoryId(catId)
                     .categoryName(catName)
-                    .colorCode(color)
-                    .icon(icon)
-                    .totalAmount(sum)
+                    .colorCode(colorCode)
+                    .totalAmount(catTotal)
                     .percentage(percentage)
-                    .transactionCount(catExpenses.size())
-                    .budgetLimit(budget)
+                    .budgetLimit(budgetLimit)
                     .overBudget(overBudget)
+                    .transactionCount(catExpenses.size())
                     .build());
         }
 
-        result.sort((a, b) -> b.getTotalAmount().compareTo(a.getTotalAmount()));
-        return result;
+        list.sort((a, b) -> b.getTotalAmount().compareTo(a.getTotalAmount()));
+        return list;
     }
 
     private List<MonthlyTrendDto> calculateMonthlyTrends(List<ExpenseDto> expenses) {
-        Map<YearMonth, List<ExpenseDto>> monthMap = expenses.stream()
-                .filter(e -> e.getExpenseDate() != null)
-                .collect(Collectors.groupingBy(e -> YearMonth.from(e.getExpenseDate())));
+        if (expenses.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("MMM yyyy");
         DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        DateTimeFormatter monthNameFormatter = DateTimeFormatter.ofPattern("MMMM yyyy");
+
+        Map<String, List<ExpenseDto>> byMonth = expenses.stream()
+                .filter(e -> e.getExpenseDate() != null)
+                .collect(Collectors.groupingBy(e -> e.getExpenseDate().format(ymFormatter)));
 
         List<MonthlyTrendDto> trends = new ArrayList<>();
 
-        monthMap.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(entry -> {
-                    YearMonth ym = entry.getKey();
-                    List<ExpenseDto> list = entry.getValue();
+        for (Map.Entry<String, List<ExpenseDto>> entry : byMonth.entrySet()) {
+            String yearMonthStr = entry.getKey();
+            List<ExpenseDto> monthExpenses = entry.getValue();
 
-                    BigDecimal total = list.stream()
-                            .map(ExpenseDto::getAmount)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal total = monthExpenses.stream()
+                    .map(ExpenseDto::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                    BigDecimal avg = !list.isEmpty()
-                            ? total.divide(BigDecimal.valueOf(list.size()), 2, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
+            YearMonth ym = YearMonth.parse(yearMonthStr);
+            String displayMonth = ym.format(monthNameFormatter);
 
-                    trends.add(MonthlyTrendDto.builder()
-                            .month(ym.format(displayFormatter))
-                            .yearMonth(ym.format(ymFormatter))
-                            .totalSpent(total)
-                            .transactionCount(list.size())
-                            .averageTransactionAmount(avg)
-                            .build());
-                });
-
-        return trends;
-    }
-
-    private List<ExpenseDto> fetchExpensesForUser(Long userId) {
-        try {
-            List<ExpenseDto> expenses = expenseClient.getAllExpenses(userId, null, null);
-            return expenses != null ? expenses : Collections.emptyList();
-        } catch (Exception e) {
-            log.warn("Feign call to expense-service failed for user {}: {}", userId, e.getMessage());
-            return Collections.emptyList();
+            trends.add(MonthlyTrendDto.builder()
+                    .yearMonth(yearMonthStr)
+                    .month(displayMonth)
+                    .totalSpent(total)
+                    .transactionCount(monthExpenses.size())
+                    .build());
         }
+
+        trends.sort(Comparator.comparing(MonthlyTrendDto::getYearMonth));
+        return trends;
     }
 }
