@@ -34,10 +34,21 @@ export const transactionService = {
   },
 
   updateTransaction: async (id, data) => {
-    return apiRequest(`/api/transactions/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    try {
+      return await apiRequest(`/api/transactions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    } catch (err) {
+      const list = getLocalTransactions();
+      const updated = list.find(transaction => String(transaction.id) === String(id));
+      if (!updated) throw err;
+      const next = list.map(transaction => String(transaction.id) === String(id)
+        ? { ...transaction, ...data, amount: parseFloat(data.amount) || transaction.amount }
+        : transaction);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
+      return next.find(transaction => String(transaction.id) === String(id));
+    }
   },
 
   deleteTransaction: async (id) => {
@@ -74,8 +85,12 @@ const LOCAL_STORAGE_KEY = 'fintrack_local_transactions';
 
 function getLocalTransactions(params = {}) {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    let list = raw ? JSON.parse(raw) : [];
+    const transactionRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const expenseRaw = localStorage.getItem('fintrack_local_expenses');
+    const transactions = transactionRaw ? JSON.parse(transactionRaw) : [];
+    const legacyExpenses = expenseRaw ? JSON.parse(expenseRaw).map(expense => ({ ...expense, type: 'EXPENSE' })) : [];
+    const byId = new Map([...transactions, ...legacyExpenses].map(transaction => [String(transaction.id), transaction]));
+    let list = Array.from(byId.values());
     if (params.type) {
       list = list.filter(t => t.type === params.type);
     }
@@ -108,9 +123,15 @@ function saveLocalTransaction(data) {
 
 function deleteLocalTransaction(id) {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return;
-    const list = JSON.parse(raw).filter(t => t.id !== id);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    const transactionRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const expenseRaw = localStorage.getItem('fintrack_local_expenses');
+    if (transactionRaw) {
+      const list = JSON.parse(transactionRaw).filter(t => String(t.id) !== String(id));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    }
+    if (expenseRaw) {
+      const list = JSON.parse(expenseRaw).filter(t => String(t.id) !== String(id));
+      localStorage.setItem('fintrack_local_expenses', JSON.stringify(list));
+    }
   } catch {}
 }

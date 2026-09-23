@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { expenseService } from '../services/expenseService';
+import { transactionService } from '../services/transactionService';
 import { categoryService } from '../services/categoryService';
+import { reportService } from '../services/reportService';
 import {
   PlusCircle,
   IndianRupee,
@@ -16,8 +17,9 @@ import {
   Sparkles
 } from 'lucide-react';
 
-export const AddExpense = ({ onSuccess, onCancel }) => {
+export const AddExpense = ({ onSuccess, onCancel, onNavigateCategories }) => {
   const [categories, setCategories] = useState([]);
+  const [categoryBreakdowns, setCategoryBreakdowns] = useState({});
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -30,16 +32,33 @@ export const AddExpense = ({ onSuccess, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [budgetError, setBudgetError] = useState(null);
+  const [incomeError, setIncomeError] = useState(null);
+  const [dashboardReport, setDashboardReport] = useState(null);
 
   useEffect(() => {
-    categoryService.getAllCategories()
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setCategories(data);
-          setFormData(prev => ({ ...prev, categoryId: data[0].id.toString() }));
-        }
-      })
-      .catch(err => console.error('Could not load categories:', err));
+    Promise.all([
+      categoryService.getAllCategories(),
+      reportService.getCategoryBreakdown(),
+      reportService.getDashboardReport()
+    ])
+    .then(([catData, breakdownData, reportData]) => {
+      if (Array.isArray(catData) && catData.length > 0) {
+        setCategories(catData);
+        setFormData(prev => ({ ...prev, categoryId: catData[0].id.toString() }));
+      }
+      if (Array.isArray(breakdownData)) {
+        const breakdownMap = {};
+        breakdownData.forEach(b => {
+          breakdownMap[b.categoryId] = b;
+        });
+        setCategoryBreakdowns(breakdownMap);
+      }
+      if (reportData) {
+        setDashboardReport(reportData);
+      }
+    })
+    .catch(err => console.error('Could not load categories or breakdown:', err));
   }, []);
 
   const handleChange = (e) => {
@@ -69,8 +88,12 @@ export const AddExpense = ({ onSuccess, onCancel }) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
+    setBudgetError(null);
+    setIncomeError(null);
 
-    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+    const expenseAmount = parseFloat(formData.amount);
+
+    if (!formData.amount || expenseAmount <= 0) {
       setError('Please enter a valid positive expense amount.');
       return;
     }
@@ -80,9 +103,49 @@ export const AddExpense = ({ onSuccess, onCancel }) => {
       return;
     }
 
+    const selectedCatId = parseInt(formData.categoryId, 10);
+    const breakdown = categoryBreakdowns[selectedCatId];
+    const selectedCategory = categories.find(c => c.id === selectedCatId);
+    
+    if (breakdown && selectedCategory) {
+      const budgetLimit = selectedCategory.budgetLimit || breakdown.budgetLimit || 0;
+      if (budgetLimit > 0) {
+        const currentSpent = breakdown.totalSpent || breakdown.totalAmount || 0;
+        if (currentSpent + expenseAmount > budgetLimit) {
+           setBudgetError({
+             spent: currentSpent,
+             limit: budgetLimit,
+             amount: expenseAmount
+           });
+           return;
+        }
+      }
+    }
+
+    if (dashboardReport) {
+      const currentMonthIncome = dashboardReport.currentMonthIncome || dashboardReport.totalIncomeAllTime || 0;
+      const currentMonthSpend = dashboardReport.currentMonthSpend || dashboardReport.totalSpendAllTime || 0;
+      
+      if (currentMonthIncome > 0 && (currentMonthSpend + expenseAmount > currentMonthIncome)) {
+        setIncomeError({
+          income: currentMonthIncome,
+          spent: currentMonthSpend,
+          amount: expenseAmount
+        });
+        return;
+      } else if (currentMonthIncome === 0) {
+        setIncomeError({
+          income: 0,
+          spent: currentMonthSpend,
+          amount: expenseAmount
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      await expenseService.createExpense({
+      await transactionService.createExpense({
         title: formData.title.trim(),
         amount: parseFloat(formData.amount),
         categoryId: parseInt(formData.categoryId, 10),
@@ -172,6 +235,72 @@ export const AddExpense = ({ onSuccess, onCancel }) => {
           }}>
             <CheckCircle2 size={16} />
             <span>{successMsg}</span>
+          </div>
+        )}
+
+        {budgetError && (
+          <div style={{
+            padding: '1rem',
+            borderRadius: '8px',
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            color: '#DC2626',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600' }}>
+              <AlertCircle size={18} />
+              <span>Budget Limit Reached!</span>
+            </div>
+            <p style={{ fontSize: '0.9rem', margin: 0 }}>
+              You have already spent <strong>₹{budgetError.spent.toFixed(2)}</strong> of your <strong>₹{budgetError.limit.toFixed(2)}</strong> budget for this category. Adding ₹{budgetError.amount.toFixed(2)} will exceed your limit.
+            </p>
+            {onNavigateCategories && (
+              <button 
+                type="button" 
+                onClick={onNavigateCategories}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '0.4rem 0.8rem',
+                  background: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Change Category Budget
+              </button>
+            )}
+          </div>
+        )}
+
+        {incomeError && (
+          <div style={{
+            padding: '1rem',
+            borderRadius: '8px',
+            background: '#FFFBEB',
+            border: '1px solid #FDE68A',
+            color: '#B45309',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600' }}>
+              <AlertCircle size={18} />
+              <span>Insufficient Income Warning!</span>
+            </div>
+            <p style={{ fontSize: '0.9rem', margin: 0 }}>
+              {incomeError.income === 0 
+                ? `You haven't logged any income yet! How can you spend without earning? Please log your income first.`
+                : `You only have ₹${incomeError.income.toFixed(2)} in income, but adding ₹${incomeError.amount.toFixed(2)} will bring your total expenses to ₹${(incomeError.spent + incomeError.amount).toFixed(2)}. You cannot spend more than you earn!`
+              }
+            </p>
           </div>
         )}
 

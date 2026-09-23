@@ -4,8 +4,8 @@
    ========================================================== */
 
 :root {
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-heading: 'Outfit', 'Inter', sans-serif;
+  --font-main: 'DM Sans', 'Segoe UI', sans-serif;
+  --font-heading: 'Manrope', 'DM Sans', sans-serif;
 
   /* Primary Deep Navy & Slate Palette */
   --primary: #0F172A;         /* Primary Deep Navy */
@@ -23,13 +23,13 @@
   --accent: #10B981;          /* Emerald Green */
   --accent-hover: #059669;    /* Dark Emerald */
   --accent-active: #047857;
-  --accent-subtle: #ECFDF5;   /* Green 50 */
-  --accent-border: #A7F3D0;   /* Green 200 */
+  --accent-subtle: #D1FAE5;   /* Light Emerald */
+  --accent-border: #10B981;   /* Green 200 */
   --emerald-500: #10B981;
   --emerald-600: #059669;
 
   /* Neutrals: Background & Surface */
-  --bg-main: #F8FAFC;         /* Slate 50 */
+  --bg-main: #F4F7F6;         /* Background */
   --bg-card: #FFFFFF;         /* White Card */
   --bg-surface: #FFFFFF;
   --bg-sidebar: #0F172A;      /* Deep Navy Sidebar */
@@ -42,8 +42,8 @@
   --border-focus: #10B981;
 
   /* Typography */
-  --text-primary: #0F172A;    /* Slate 900 */
-  --text-secondary: #64748B;  /* Slate 500 */
+  --text-primary: #111827;    /* Text */
+  --text-secondary: #64748B;  /* Muted */
   --text-muted: #94A3B8;
   --text-white: #FFFFFF;
   --text-nav: #94A3B8;
@@ -51,16 +51,16 @@
 
   /* Semantic Feedback */
   --success: #10B981;         /* Green */
-  --success-subtle: #ECFDF5;
-  --success-border: #A7F3D0;
+  --success-subtle: #D1FAE5;
+  --success-border: #10B981;
   --warning: #F59E0B;         /* Amber */
   --warning-subtle: #FFFBEB;
   --warning-border: #FDE68A;
   --amber-500: #F59E0B;
-  --danger: #DC2626;          /* Red */
-  --danger-subtle: #FEF2F2;
-  --danger-border: #FECACA;
-  --rose-500: #DC2626;
+  --danger: #EF4444;          /* Expense */
+  --danger-subtle: #FEE2E2;
+  --danger-border: #FCA5A5;
+  --rose-500: #EF4444;
   --indigo: #6366F1;
 
   /* Shadows */
@@ -93,6 +93,22 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(16, 185, 129, 0.35);
+  outline-offset: 2px;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -134,11 +150,190 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .page-wrapper {
-  padding: 2rem 2.5rem;
+  padding: 2.25rem 3rem 3.5rem;
   max-width: 1360px;
   width: 100%;
   margin: 0 auto;
   animation: fadeIn 0.25s ease-out;
+}
+
+.dashboard-heading {
+  margin-bottom: 2rem;
+}
+
+.dashboard-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  color: var(--accent-hover);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboard-sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.35rem;
+  padding-left: 0.65rem;
+  border-left: 1px solid #A7F3D0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.dashboard-heading h2 {
+  font-size: clamp(1.85rem, 2.7vw, 2.55rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.dashboard-heading p {
+  margin-top: 0.55rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-chart-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+  margin-bottom: 1.5rem;
+  align-items: start;
+}
+
+.dashboard-panel {
+  min-width: 0;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.dashboard-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.35rem;
+}
+
+.dashboard-panel-header h3 {
+  font-size: 1.18rem;
+}
+
+.dashboard-panel-header p {
+  margin-top: 0.28rem;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.dashboard-empty-state {
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-main);
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.category-panel-summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 1rem;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.category-panel-summary-label {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.category-panel-summary-value {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.category-panel-summary-track {
+  grid-column: 1 / -1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--slate-200);
+}
+
+.category-panel-summary-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #34D399);
+}
+
+.dashboard-transaction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-main);
+  transition: var(--transition);
+}
+
+.dashboard-transaction:hover {
+  border-color: #A7F3D0;
+  background: #F8FFFC;
+  transform: translateX(2px);
+}
+
+.dashboard-transaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.dashboard-transaction-main,
+.dashboard-transaction-icon,
+.dashboard-transaction-meta {
+  display: flex;
+  align-items: center;
+}
+
+.dashboard-transaction-main { gap: 0.75rem; min-width: 0; }
+.dashboard-transaction-icon {
+  width: 34px;
+  height: 34px;
+  justify-content: center;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+.dashboard-transaction-icon.income { background: #ECFDF5; color: var(--accent-hover); }
+.dashboard-transaction-icon.expense { background: #EEF2F5; color: var(--navy-900); }
+.dashboard-transaction-title { font-size: 0.95rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-transaction-date { color: var(--text-secondary); font-size: 0.8rem; }
+.dashboard-transaction-meta { flex-direction: column; align-items: flex-end; gap: 0.2rem; flex-shrink: 0; }
+.dashboard-transaction-amount { font-size: 1rem; font-weight: 800; }
+.dashboard-transaction-amount.income { color: var(--accent-hover); }
+
+@media (max-width: 768px) {
+  .page-wrapper { padding: 1.5rem 1rem 2.5rem; }
+  .dashboard-heading { margin-bottom: 1.5rem; }
+  .dashboard-chart-grid { grid-template-columns: 1fr; }
+  .dashboard-panel { padding: 1.15rem; }
 }
 
 @keyframes fadeIn {
@@ -302,6 +497,55 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 768px) {
   .grid-2, .grid-4 { grid-template-columns: 1fr; }
   .app-container { flex-direction: column; }
+  .app-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    position: relative !important;
+    padding: 0.75rem !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #1E293B;
+  }
+  .app-sidebar > div:first-child {
+    padding: 0.35rem 0.5rem 0.75rem !important;
+    margin-bottom: 0.65rem !important;
+  }
+  .app-sidebar-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+    overflow-x: auto;
+    padding: 0 !important;
+    scrollbar-width: none;
+  }
+  .app-sidebar-nav::-webkit-scrollbar { display: none; }
+  .app-sidebar-nav > div {
+    min-width: max-content;
+  }
+  .app-sidebar-nav > div > div:first-child {
+    padding: 0 0.5rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+  .app-sidebar-nav > div > div:last-child {
+    flex-direction: row !important;
+  }
+  .app-sidebar-nav button {
+    width: auto !important;
+    padding: 0.55rem 0.7rem !important;
+    border-left: 0 !important;
+    border-bottom: 3px solid transparent !important;
+  }
+  .app-sidebar-nav button.active {
+    border-bottom-color: #10B981 !important;
+  }
+  .app-sidebar > div:last-child {
+    padding-top: 0.65rem !important;
+  }
+  .app-header {
+    padding: 0.8rem 1rem !important;
+  }
+  .app-header h1 { font-size: 1.05rem !important; }
+  .app-header p { font-size: 0.72rem !important; }
 }
 
 /* Badges & Status */

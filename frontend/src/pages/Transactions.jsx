@@ -18,6 +18,7 @@ import {
   TrendingUp,
   TrendingDown,
   Trash2,
+  Pencil,
   Tag,
   Paperclip
 } from 'lucide-react';
@@ -48,6 +49,9 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
 
   // Modal for receipt image
   const [selectedReceiptTx, setSelectedReceiptTx] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -114,6 +118,42 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
       } catch (err) {
         alert('Failed to delete transaction: ' + err.message);
       }
+    }
+  };
+
+  const openEditModal = (transaction) => {
+    setEditError('');
+    setEditingTransaction({
+      ...transaction,
+      transactionDate: transaction.transactionDate || transaction.expenseDate || new Date().toISOString().split('T')[0],
+      categoryId: transaction.categoryId || transaction.category?.id || ''
+    });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingTransaction?.title?.trim() || !editingTransaction.amount || Number(editingTransaction.amount) <= 0) {
+      setEditError('Enter a title and a positive amount.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      await transactionService.updateTransaction(editingTransaction.id, {
+        type: editingTransaction.type,
+        title: editingTransaction.title.trim(),
+        amount: Number(editingTransaction.amount),
+        categoryId: editingTransaction.type === 'EXPENSE' ? Number(editingTransaction.categoryId) || null : null,
+        transactionDate: editingTransaction.transactionDate,
+        paymentMethod: editingTransaction.paymentMethod,
+        description: editingTransaction.description || ''
+      });
+      setEditingTransaction(null);
+      await fetchTransactions();
+    } catch (err) {
+      setEditError(err.message || 'Unable to update this transaction.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -476,6 +516,14 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
 
                       <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
                         <button
+                          onClick={() => openEditModal(tx)}
+                          className="btn btn-secondary btn-icon"
+                          title="Edit Transaction"
+                          style={{ color: '#4F46E5', borderColor: '#C7D2FE', padding: '0.35rem', marginRight: '0.35rem' }}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
                           onClick={() => handleDelete(tx.id)}
                           className="btn btn-secondary btn-icon"
                           title="Delete Transaction"
@@ -492,6 +540,53 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
           </div>
         )}
       </div>
+
+      {/* Quick Salary Log Modal */}
+      <Modal isOpen={Boolean(editingTransaction)} onClose={() => setEditingTransaction(null)} title="Edit Transaction">
+        <form onSubmit={handleEditSubmit}>
+          {editError && <div className="form-error" style={{ marginBottom: '1rem' }}>{editError}</div>}
+          <div className="form-group">
+            <label className="form-label">Title *</label>
+            <input className="form-input" required value={editingTransaction?.title || ''} onChange={e => setEditingTransaction(prev => ({ ...prev, title: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount (₹) *</label>
+            <input className="form-input" type="number" min="0.01" step="0.01" required value={editingTransaction?.amount || ''} onChange={e => setEditingTransaction(prev => ({ ...prev, amount: e.target.value }))} />
+          </div>
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input className="form-input" type="date" required value={editingTransaction?.transactionDate || ''} onChange={e => setEditingTransaction(prev => ({ ...prev, transactionDate: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Payment Method</label>
+              <select className="form-select" value={editingTransaction?.paymentMethod || 'CARD'} onChange={e => setEditingTransaction(prev => ({ ...prev, paymentMethod: e.target.value }))}>
+                <option value="CARD">Card</option>
+                <option value="UPI">UPI / Wallet</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CASH">Cash</option>
+              </select>
+            </div>
+          </div>
+          {editingTransaction?.type === 'EXPENSE' && (
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select className="form-select" value={editingTransaction.categoryId || ''} onChange={e => setEditingTransaction(prev => ({ ...prev, categoryId: e.target.value }))}>
+                <option value="">General</option>
+                {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea className="form-textarea" rows="3" value={editingTransaction?.description || ''} onChange={e => setEditingTransaction(prev => ({ ...prev, description: e.target.value }))} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setEditingTransaction(null)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={savingEdit}>{savingEdit ? 'Saving...' : 'Save Changes'}</button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Quick Salary Log Modal */}
       <Modal isOpen={isIncomeModalOpen} onClose={() => setIsIncomeModalOpen(false)} title="Log Monthly Salary & Inflows">

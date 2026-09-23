@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { saveAuthData, clearAuthData } from '../utils/tokenUtils';
+import { saveAuthData, clearAuthData, getStoredToken } from '../utils/tokenUtils';
 
 export const authService = {
   async register(username, email, password, fullName) {
@@ -41,7 +41,7 @@ export const authService = {
       body: JSON.stringify(profileData)
     });
     if (updatedUser) {
-      const token = localStorage.getItem('fintrack_jwt_token');
+      const token = getStoredToken();
       saveAuthData(token, updatedUser);
     }
     return updatedUser;

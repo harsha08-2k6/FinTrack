@@ -68,6 +68,7 @@ export const Navbar = ({ activePage }) => {
       case 'categories': return 'Categories & Budgets';
       case 'analytics': return 'Spending Analytics';
       case 'reports': return 'Financial Reports & Statements';
+      case 'goals': return 'Savings Goals';
       case 'settings':
       case 'profile': return 'Account & Profile Settings';
       default: return 'FinTrack';
@@ -75,7 +76,7 @@ export const Navbar = ({ activePage }) => {
   };
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       background: '#0F172A',
       borderBottom: '1px solid #1E293B',
       padding: '1rem 2.5rem',

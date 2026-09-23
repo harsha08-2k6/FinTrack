@@ -12,7 +12,8 @@ import {
   CreditCard,
   Wallet,
   Sliders,
-  TrendingUp
+  TrendingUp,
+  Target
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -40,7 +41,8 @@ export const Sidebar = ({ activePage, setActivePage }) => {
       title: 'ANALYTICS & REPORTS',
       items: [
         { id: 'analytics', label: 'Spending Analytics', icon: PieChart },
-        { id: 'reports', label: 'Reports & Statements', icon: FileText }
+        { id: 'reports', label: 'Reports & Statements', icon: FileText },
+        { id: 'goals', label: 'Savings Goals', icon: Target }
       ]
     },
     {
@@ -52,7 +54,7 @@ export const Sidebar = ({ activePage, setActivePage }) => {
   ];
 
   return (
-    <aside style={{
+    <aside className="app-sidebar" style={{
       width: '260px',
       background: '#0F172A',
       borderRight: '1px solid #1E293B',
@@ -118,7 +120,7 @@ export const Sidebar = ({ activePage, setActivePage }) => {
       </div>
 
       {/* Nav Section Groups */}
-      <nav style={{
+      <nav className="app-sidebar-nav" style={{
         display: 'flex',
         flexDirection: 'column',
         gap: '1.15rem',
@@ -149,6 +151,7 @@ export const Sidebar = ({ activePage, setActivePage }) => {
                 return (
                   <button
                     key={item.id}
+                    className={`app-nav-item${isActive ? ' active' : ''}`}
                     onClick={() => setActivePage(item.id)}
                     style={{
                       display: 'flex',

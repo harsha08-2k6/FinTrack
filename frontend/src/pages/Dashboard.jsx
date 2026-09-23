@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   Tag,
   Percent,
-  PiggyBank
+  PiggyBank,
+  Activity
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
@@ -36,6 +37,7 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // Quick Income Modal State
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -67,6 +69,7 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
         ? categoryData 
         : (categoryData && Array.isArray(categoryData.content) ? categoryData.content : []);
       setCategories(catList);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching dashboard info:', err);
     } finally {
@@ -77,11 +80,14 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
 
   useEffect(() => {
     fetchDashboardData();
+    const refreshInterval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(refreshInterval);
   }, []);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    if (refreshing) return;
     setRefreshing(true);
-    fetchDashboardData();
+    await fetchDashboardData();
   };
 
   const handleQuickSaveIncome = async (e) => {
@@ -154,12 +160,10 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
 
   // Calculate 4 Core Pillars
   const currentMonthSpend = report?.currentMonthSpend || 0;
-  const currentMonthIncome = report?.currentMonthIncome || 0;
-  const totalAllTimeSpend = report?.totalSpendAllTime || 0;
-  const totalAllTimeIncome = report?.totalIncomeAllTime || 0;
+  const currentMonthIncome = report?.currentMonthIncome || report?.totalIncomeAllTime || 0;
   
-  const currentMonthSavings = currentMonthIncome - currentMonthSpend;
-  const savingsRate = currentMonthIncome > 0 ? (currentMonthSavings / currentMonthIncome) * 100 : 0;
+  const totalBudget = categories.reduce((sum, cat) => sum + (cat.budgetLimit || 0), 0);
+  const remainingBudget = totalBudget - currentMonthSpend;
   
   const momChange = report?.monthOverMonthChangePercentage;
   const breakdowns = report?.categoryBreakdowns || [];
@@ -168,25 +172,30 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
   return (
     <div className="page-wrapper">
       {/* Top Banner & Quick Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="dashboard-heading" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.02em' }}>
+          <div className="dashboard-kicker">
+            <Activity size={13} /> Personal finance workspace
+            {lastUpdated && <span className="dashboard-sync-status">Synced {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+          </div>
+          <h2>
             Financial Overview
           </h2>
-          <p style={{ fontSize: '0.875rem', color: '#64748B' }}>
+          <p>
             Track your monthly salary, daily expenses, and savings goals
           </p>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="dashboard-actions">
           <button
+            type="button"
             onClick={handleRefresh}
             className="btn btn-secondary"
             title="Refresh Data"
             disabled={refreshing}
           >
             <RefreshCw size={15} className={refreshing ? 'spin-anim' : ''} />
-            <span>Refresh</span>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
           <button
@@ -213,15 +222,26 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
         {/* Pillar 1: Monthly Income */}
         <MetricStatCard
           title="Monthly Income"
-          value={currentMonthIncome > 0 ? currentMonthIncome : (totalAllTimeIncome > 0 ? totalAllTimeIncome : 0)}
-          subtext={currentMonthIncome > 0 ? "Total money in this month" : "Click 'Log Income' above"}
+          value={currentMonthIncome}
+          subtext={currentMonthIncome > 0 ? "Total money earned this month" : "Click 'Log Income' above"}
           icon={Wallet}
           valueColor="#10B981"
           iconBg="#ECFDF5"
           iconColor="#10B981"
         />
 
-        {/* Pillar 2: Total Expenses */}
+        {/* Pillar 2: Total Budget */}
+        <MetricStatCard
+          title="Total Budget"
+          value={totalBudget}
+          subtext="Combined limit of all categories"
+          icon={Sliders}
+          valueColor="#10B981"
+          iconBg="#ECFDF5"
+          iconColor="#10B981"
+        />
+
+        {/* Pillar 3: Total Expenses */}
         <MetricStatCard
           title="Total Expenses"
           value={currentMonthSpend}
@@ -233,47 +253,36 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
           iconColor="#0F172A"
         />
 
-        {/* Pillar 3: Total Savings */}
+        {/* Pillar 4: Remaining Budget */}
         <MetricStatCard
-          title="Total Savings"
-          value={currentMonthIncome > 0 ? currentMonthSavings : (totalAllTimeIncome > 0 ? (totalAllTimeIncome - totalAllTimeSpend) : 0)}
-          subtext={currentMonthSavings >= 0 ? "Money saved this month" : "Spent more than earned"}
-          icon={PiggyBank}
-          valueColor={currentMonthSavings >= 0 ? "#10B981" : "#DC2626"}
-          iconBg={currentMonthSavings >= 0 ? "#ECFDF5" : "#FEF2F2"}
-          iconColor={currentMonthSavings >= 0 ? "#10B981" : "#DC2626"}
-        />
-
-        {/* Pillar 4: Savings Rate */}
-        <MetricStatCard
-          title="Savings Rate"
-          value={currentMonthIncome > 0 ? `${savingsRate.toFixed(1)}%` : "0.0%"}
-          subtext={savingsRate >= 20 ? "Great job! Target reached (≥ 20%)" : "Target: 20% or higher"}
-          icon={Percent}
-          valueColor={savingsRate >= 20 ? "#10B981" : (savingsRate > 0 ? "#D97706" : "#0F172A")}
-          iconBg={savingsRate >= 20 ? "#ECFDF5" : "#F1F5F9"}
-          iconColor={savingsRate >= 20 ? "#10B981" : "#64748B"}
+          title="Remaining Budget"
+          value={remainingBudget}
+          subtext={remainingBudget >= 0 ? "Under your budget limit" : "Over budget!"}
+          icon={remainingBudget >= 0 ? ShieldCheck : TrendingDown}
+          valueColor={remainingBudget >= 0 ? "#10B981" : "#DC2626"}
+          iconBg={remainingBudget >= 0 ? "#ECFDF5" : "#FEF2F2"}
+          iconColor={remainingBudget >= 0 ? "#10B981" : "#DC2626"}
         />
       </div>
 
       {/* Main Visuals Grid: Spending Trend & Category Share */}
-      <div className="grid-2" style={{ marginBottom: '2rem', gridTemplateColumns: '1.4fr 1fr' }}>
+      <div className="grid-2 dashboard-chart-grid">
         {/* Stock Market Area Chart */}
-        <div className="card" style={{ padding: '1.75rem', background: '#FFFFFF' }}>
+        <div className="card dashboard-panel">
           <StockMarketChart 
             data={monthlyTrends} 
             title="Monthly Spending Trend"
             subtext="Interactive timeline showing your monthly spending habits"
-            height={240}
+            height={180}
           />
         </div>
 
         {/* Category Budget & Spending Breakdown */}
-        <div className="card" style={{ padding: '1.75rem', background: '#FFFFFF' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <div className="card dashboard-panel">
+          <div className="dashboard-panel-header">
             <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F172A' }}>Spending by Category</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748B' }}>How your money is divided across categories</p>
+              <h3>Spending by Category</h3>
+              <p>How your money is divided across categories</p>
             </div>
             <button 
               onClick={handleOpenBudgetModal}
@@ -293,8 +302,8 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
           </div>
 
           {breakdowns.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#F8FAFC', borderRadius: '10px', border: '1px dashed #E2E8F0' }}>
-              <p style={{ color: '#64748B', fontSize: '0.85rem' }}>
+            <div className="dashboard-empty-state">
+              <p>
                 No category expenses recorded yet. Add an expense to see breakdown.
               </p>
             </div>
@@ -321,15 +330,28 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
               ))}
             </div>
           )}
+
+          <div className="category-panel-summary">
+            <span className="category-panel-summary-label">Budget used this month</span>
+            <span className="category-panel-summary-value">
+              {totalBudget > 0 ? `${Math.min(100, Math.round((currentMonthSpend / totalBudget) * 100))}%` : 'No budget set'}
+            </span>
+            <div className="category-panel-summary-track">
+              <div
+                className="category-panel-summary-fill"
+                style={{ width: `${totalBudget > 0 ? Math.min(100, Math.max(0, (currentMonthSpend / totalBudget) * 100)) : 0}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Recent Transactions Stream */}
-      <div className="card" style={{ padding: '1.75rem', background: '#FFFFFF', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+      <div className="card dashboard-panel" style={{ marginBottom: '1.5rem' }}>
+        <div className="dashboard-panel-header">
           <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F172A' }}>Recent Transactions</h3>
-            <p style={{ fontSize: '0.78rem', color: '#64748B' }}>Latest income deposits and expenses</p>
+            <h3>Recent Transactions</h3>
+            <p>Latest income deposits and expenses</p>
           </div>
           {onNavigateExpenses && (
             <button onClick={onNavigateExpenses} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
@@ -340,53 +362,29 @@ export const Dashboard = ({ onNavigateExpenses, onNavigateAddExpense, onNavigate
         </div>
 
         {recentTransactions.length === 0 ? (
-          <p style={{ fontSize: '0.85rem', color: '#94A3B8', textAlign: 'center', padding: '1.5rem 0' }}>
+          <p className="dashboard-empty-state">
             No transactions yet. Click <strong>+ Log Income</strong> or <strong>+ Add Expense</strong> to get started.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          <div className="dashboard-transaction-list">
             {recentTransactions.map(tx => {
               const isIncome = tx.type === 'INCOME';
               return (
-                <div
-                  key={tx.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.75rem 1rem',
-                    background: '#F8FAFC',
-                    borderRadius: '8px',
-                    border: '1px solid #E2E8F0'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '7px',
-                      background: isIncome ? '#ECFDF5' : '#F1F5F9',
-                      color: isIncome ? '#10B981' : '#0F172A',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
+                <div key={tx.id} className="dashboard-transaction">
+                  <div className="dashboard-transaction-main">
+                    <div className={`dashboard-transaction-icon ${isIncome ? 'income' : 'expense'}`}>
                       {isIncome ? <TrendingUp size={16} /> : <CreditCard size={16} />}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0F172A' }}>{tx.title}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                      <div className="dashboard-transaction-title">{tx.title}</div>
+                      <div className="dashboard-transaction-date">
                         {formatDate(tx.transactionDate || tx.expenseDate)} • {tx.paymentMethod || 'CARD'}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{
-                      fontSize: '0.95rem',
-                      fontWeight: '800',
-                      color: isIncome ? '#10B981' : '#0F172A'
-                    }}>
+                  <div className="dashboard-transaction-meta">
+                    <div className={`dashboard-transaction-amount ${isIncome ? 'income' : ''}`}>
                       {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
                     </div>
                     <span className="badge" style={{

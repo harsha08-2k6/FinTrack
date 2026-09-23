@@ -18,8 +18,11 @@ export const StockMarketChart = ({
     
     return data.map((d, i) => {
       const amount = typeof d.totalSpent === 'number' ? d.totalSpent : (parseFloat(d.totalSpent) || 0);
-      const label = d.month ? d.month.slice(0, 3) : (d.yearMonth ? d.yearMonth.slice(5) : `P${i + 1}`);
-      const fullLabel = d.month ? `${d.month} ${d.yearMonth ? d.yearMonth.slice(0, 4) : ''}` : (d.yearMonth || `Period ${i + 1}`);
+      const monthName = d.month ? String(d.month).replace(/\s+\d{4}$/, '') : '';
+      const label = monthName ? monthName.slice(0, 3) : (d.yearMonth ? d.yearMonth.slice(5) : `P${i + 1}`);
+      const fullLabel = d.yearMonth
+        ? `${monthName || d.yearMonth.slice(5)} ${d.yearMonth.slice(0, 4)}`
+        : (monthName || `Period ${i + 1}`);
       const txCount = d.transactionCount || 1;
       return {
         ...d,
@@ -194,8 +197,8 @@ export const StockMarketChart = ({
             <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.01em' }}>
               {title}
             </h3>
-            <span className="badge badge-emerald" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem' }}>
-              LIVE TICKER
+              <span className="badge badge-emerald" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem' }}>
+              MONTHLY TREND
             </span>
           </div>
           <p style={{ fontSize: '0.78rem', color: '#64748B' }}>
@@ -293,7 +296,7 @@ export const StockMarketChart = ({
           No transaction trajectory points to display.
         </div>
       ) : (
-        <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', width: '100%', overflow: 'visible' }}>
           <svg
             ref={svgRef}
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}

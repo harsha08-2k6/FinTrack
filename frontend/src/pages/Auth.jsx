@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
+import { getPasswordRuleResults, isStrongPassword } from '../utils/passwordValidation';
 
 export const Auth = ({ initialMode = 'login', onSuccess }) => {
   const { login, register } = useAuth();
@@ -42,17 +43,10 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Password validation rules
-  const passwordRules = [
-    { label: 'At least 8 characters', valid: regData.password.length >= 8 },
-    { label: 'At least 1 uppercase letter (A-Z)', valid: /[A-Z]/.test(regData.password) },
-    { label: 'At least 1 lowercase letter (a-z)', valid: /[a-z]/.test(regData.password) },
-    { label: 'At least 1 number (0-9)', valid: /[0-9]/.test(regData.password) },
-    { label: 'At least 1 special character (@#$%!...)', valid: /[@#$%!^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(regData.password) }
-  ];
+  const passwordRules = getPasswordRuleResults(regData.password);
 
   const validRulesCount = passwordRules.filter(r => r.valid).length;
-  const isStrongPassword = validRulesCount === 5;
+  const passwordIsStrong = isStrongPassword(regData.password);
 
   const getStrengthMeta = () => {
     if (regData.password.length === 0) return { label: 'Empty', color: '#94A3B8', width: '0%' };
@@ -94,7 +88,7 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
     e.preventDefault();
     setError('');
 
-    if (!isStrongPassword) {
+    if (!passwordIsStrong) {
       setError('Password does not meet all strong security requirements.');
       return;
     }

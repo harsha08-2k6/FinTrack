@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { getPasswordRuleResults, isStrongPassword } from '../utils/passwordValidation';
 import { formatDate } from '../utils/formatDate';
 import { 
   User, 
@@ -17,6 +18,7 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  XCircle,
   KeyRound,
   Save,
   ShieldCheck,
@@ -47,6 +49,8 @@ export const Profile = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const passwordRules = getPasswordRuleResults(passwordForm.newPassword);
+  const validPasswordRules = passwordRules.filter(rule => rule.valid).length;
 
   const handleProfileChange = (e) => {
     setProfileForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -87,8 +91,8 @@ export const Profile = () => {
       return;
     }
 
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters long.');
+    if (!isStrongPassword(passwordForm.newPassword)) {
+      setPasswordError('Password must meet all security requirements below.');
       return;
     }
 
@@ -346,7 +350,7 @@ export const Profile = () => {
 
               {/* New Password */}
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label">New Password * (Min 6 characters)</label>
+                <label className="form-label">New Password * (Strong password required)</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showNewPassword ? 'text' : 'password'}
@@ -376,6 +380,30 @@ export const Profile = () => {
                   >
                     {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
+                </div>
+              </div>
+
+              <div style={{
+                marginTop: '-0.4rem',
+                marginBottom: '1.25rem',
+                padding: '0.75rem 0.85rem',
+                border: '1px solid #E2E8F0',
+                borderRadius: '10px',
+                background: '#F8FAFC'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569' }}>Password requirements</span>
+                  <span style={{ fontSize: '0.7rem', color: validPasswordRules === passwordRules.length ? '#047857' : '#64748B', fontWeight: '600' }}>
+                    {validPasswordRules}/{passwordRules.length} met
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: '0.3rem' }}>
+                  {passwordRules.map(rule => (
+                    <div key={rule.label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.74rem', color: rule.valid ? '#047857' : '#64748B' }}>
+                      {rule.valid ? <CheckCircle2 size={13} color="#10B981" /> : <XCircle size={13} color="#CBD5E1" />}
+                      <span>{rule.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 

@@ -1,12 +1,15 @@
 import { apiRequest } from './api';
 
 function getLocalExpenses() {
-  const data = localStorage.getItem('fintrack_local_expenses');
-  if (!data) {
-    return [];
-  }
   try {
-    return JSON.parse(data);
+    const legacyData = localStorage.getItem('fintrack_local_expenses');
+    const transactionData = localStorage.getItem('fintrack_local_transactions');
+    const legacyExpenses = legacyData ? JSON.parse(legacyData) : [];
+    const transactions = transactionData
+      ? JSON.parse(transactionData).filter(transaction => transaction.type === 'EXPENSE')
+      : [];
+    const byId = new Map([...legacyExpenses, ...transactions].map(expense => [String(expense.id), expense]));
+    return Array.from(byId.values());
   } catch {
     return [];
   }

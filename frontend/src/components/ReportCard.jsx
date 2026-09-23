@@ -27,7 +27,7 @@ export const MetricStatCard = ({
       justifyContent: 'space-between'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#64748B' }}>
+        <span style={{ fontSize: '0.95rem', fontWeight: '600', color: '#64748B' }}>
           {title}
         </span>
         <div style={{
@@ -45,7 +45,7 @@ export const MetricStatCard = ({
       </div>
 
       <div style={{
-        fontSize: '1.8rem',
+        fontSize: '2rem',
         fontWeight: '800',
         fontFamily: 'var(--font-heading)',
         color: valueColor,
@@ -55,7 +55,7 @@ export const MetricStatCard = ({
         {typeof value === 'number' ? formatCurrency(value) : value}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}>
         {change !== undefined && (
           <span style={{
             display: 'flex',
