@@ -17,7 +17,7 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:9000/eureka/}
   instance:
     prefer-ip-address: true
 
@@ -30,3 +30,23 @@ management:
     web:
       exposure:
         include: health,info
+
+fintrack:
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:your_corporate_sender@gmail.com}
+    password: ${SMTP_PASSWORD:your_16_char_google_app_password}
+    from-email: ${SMTP_FROM_EMAIL:your_corporate_sender@gmail.com}
+    from-name: ${SMTP_FROM_NAME:FinTrack Security}
+    enabled: ${SMTP_ENABLED:false}
+    auth: ${SMTP_AUTH:true}
+    starttls:
+      enable: ${SMTP_STARTTLS:true}
+      required: ${SMTP_STARTTLS_REQUIRED:true}
+    timeout-ms: ${SMTP_TIMEOUT_MS:10000}
+    connection-timeout-ms: ${SMTP_CONNECTION_TIMEOUT_MS:10000}
+    write-timeout-ms: ${SMTP_WRITE_TIMEOUT_MS:10000}
+  auth:
+    frontend-url: ${FRONTEND_URL:http://localhost:5173}
+    reset-token-ttl-minutes: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:30}

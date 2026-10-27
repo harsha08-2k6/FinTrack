@@ -2,12 +2,12 @@ import React from 'react';
 import { Tag, Trash2, Edit2, ShieldAlert, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
-export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
-  const limit = category.budgetLimit || 0;
+export const CategoryCard = ({ category, spent = 0, onDelete, onEdit, onSelect }) => {
+  const limit = parseFloat(category.budgetLimit) || 0;
   const rawPercentage = limit > 0 ? (spent / limit) * 100 : 0;
   const percentage = Math.min(rawPercentage, 100);
-  const isOverBudget = limit > 0 && spent > limit;
-  const isWarning = limit > 0 && spent >= limit * 0.8 && !isOverBudget;
+  const isOverBudget = limit > 0 && spent >= limit;
+  const isWarning = limit > 0 && rawPercentage >= 80 && !isOverBudget;
   const color = category.colorCode || '#10B981';
   const remaining = limit > 0 ? limit - spent : 0;
 
@@ -15,16 +15,34 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
   const barColor = isOverBudget ? '#DC2626' : isWarning ? '#F59E0B' : color;
 
   return (
-    <div className="card" style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      gap: '1rem',
-      background: '#FFFFFF',
-      border: '1px solid #E2E8F0',
-      borderRadius: '12px',
-      padding: '1.5rem',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-    }}>
+    <div
+      className="card"
+      onClick={() => onSelect && onSelect(category)}
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '1rem',
+        background: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '12px',
+        padding: '1.5rem',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        cursor: onSelect ? 'pointer' : 'default',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+      }}
+      onMouseEnter={(e) => {
+        if (onSelect) {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 6px 12px -2px rgba(0,0,0,0.08)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onSelect) {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+        }
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{
@@ -42,19 +60,19 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
             <Tag size={18} />
           </div>
           <div>
-            <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0F172A' }}>{category.name}</h4>
+            <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0F172A', margin: 0 }}>{category.name}</h4>
             <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
-              {category.isCustom ? 'Custom Category' : 'System Default'}
+              {category.isCustom ? 'Custom Category' : 'System Category'}
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={(e) => e.stopPropagation()}>
           {onEdit && (
             <button
               onClick={() => onEdit(category)}
               className="btn btn-secondary btn-icon"
-              title="Edit category & budget"
+              title="Edit category details & budget limit"
               style={{ padding: '0.35rem', color: '#64748B' }}
             >
               <Edit2 size={14} />
@@ -75,7 +93,7 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
       </div>
 
       {category.description && (
-        <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
+        <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4, margin: 0 }}>
           {category.description}
         </p>
       )}
@@ -107,7 +125,7 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
                 height: '100%',
                 background: barColor,
                 borderRadius: '9999px',
-                transition: 'width 0.5s ease-in-out'
+                transition: 'width 0.4s ease-in-out'
               }}
             />
           </div>
@@ -115,12 +133,18 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.6rem' }}>
             <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '500' }}>
               {rawPercentage.toFixed(0)}% utilized 
-              {remaining > 0 && <span style={{ color: '#059669', marginLeft: '4px' }}>({formatCurrency(remaining)} left)</span>}
+              {remaining > 0 ? (
+                <span style={{ color: '#059669', marginLeft: '4px' }}>({formatCurrency(remaining)} left)</span>
+              ) : remaining < 0 ? (
+                <span style={{ color: '#DC2626', marginLeft: '4px' }}>({formatCurrency(Math.abs(remaining))} over)</span>
+              ) : (
+                <span style={{ color: '#D97706', marginLeft: '4px' }}>(₹0 left)</span>
+              )}
             </span>
 
             {isOverBudget ? (
               <span className="badge badge-rose" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
-                <ShieldAlert size={11} /> Over +{formatCurrency(spent - limit)}
+                <ShieldAlert size={11} /> Over Budget
               </span>
             ) : isWarning ? (
               <span className="badge badge-amber" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
@@ -138,16 +162,26 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '0.65rem 0.85rem',
+          padding: '0.75rem 0.95rem',
           background: '#F8FAFC',
           border: '1px dashed #CBD5E1',
           borderRadius: '8px',
           fontSize: '0.8rem'
         }}>
-          <span style={{ color: '#64748B', fontWeight: '500' }}>No budget defined</span>
+          <div>
+            <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE', fontSize: '0.7rem', marginRight: '0.5rem' }}>
+              Uncapped
+            </span>
+            <span style={{ color: '#64748B', fontWeight: '600' }}>
+              Spent: <strong style={{ color: '#0F172A' }}>{formatCurrency(spent)}</strong>
+            </span>
+          </div>
           {onEdit && (
             <button
-              onClick={() => onEdit(category)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(category);
+              }}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -160,9 +194,33 @@ export const CategoryCard = ({ category, spent = 0, onDelete, onEdit }) => {
                 gap: '0.25rem'
               }}
             >
-              + Set Budget
+              + Set Limit
             </button>
           )}
+        </div>
+      )}
+
+      {/* Footer prompt to view matching transactions */}
+      {onSelect && (
+        <div style={{
+          paddingTop: '0.65rem',
+          borderTop: '1px solid #F1F5F9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.76rem',
+          color: '#64748B'
+        }}>
+          <span>Inspect {category.name} records</span>
+          <span style={{
+            color: '#10B981',
+            fontWeight: '700',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.2rem'
+          }}>
+            View Transactions →
+          </span>
         </div>
       )}
     </div>

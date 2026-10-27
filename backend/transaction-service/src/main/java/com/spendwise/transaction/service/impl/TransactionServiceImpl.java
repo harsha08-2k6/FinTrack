@@ -27,10 +27,15 @@ public class TransactionServiceImpl implements TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final CategoryClient categoryClient;
+    private final com.spendwise.transaction.service.NotificationService notificationService;
 
-    public TransactionServiceImpl(TransactionRepository transactionRepository, CategoryClient categoryClient) {
+    public TransactionServiceImpl(
+            TransactionRepository transactionRepository,
+            CategoryClient categoryClient,
+            com.spendwise.transaction.service.NotificationService notificationService) {
         this.transactionRepository = transactionRepository;
         this.categoryClient = categoryClient;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -48,6 +53,18 @@ public class TransactionServiceImpl implements TransactionService {
 
         Transaction saved = transactionRepository.save(transaction);
         log.info("Transaction created: id={}, type={}, amount={}, userId={}", saved.getId(), saved.getType(), saved.getAmount(), userId);
+
+        // Event integration: Trigger asynchronous notification & email dispatch (non-blocking)
+        try {
+            if (saved.getType() == TransactionType.EXPENSE) {
+                notificationService.processExpenseCreated(saved);
+            } else if (saved.getType() == TransactionType.INCOME) {
+                notificationService.processIncomeCreated(saved);
+            }
+        } catch (Exception e) {
+            log.warn("Non-fatal notification dispatch error for transactionId={}: {}", saved.getId(), e.getMessage());
+        }
+
         return mapToResponse(saved);
     }
 

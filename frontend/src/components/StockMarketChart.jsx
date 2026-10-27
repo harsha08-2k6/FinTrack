@@ -6,11 +6,24 @@ export const StockMarketChart = ({
   data = [], 
   height = 260,
   title = "Expenditure Trajectory",
-  subtext = "Real-time financial trend graph"
+  subtext = "Real-time financial trend graph",
+  periodTotal = null,
+  periodLabel = null,
+  periodDelta = null,
+  periodDeltaLabel = null
 }) => {
   const [hoverIndex, setHoverIndex] = useState(null);
-  const [chartType, setChartType] = useState('area'); // 'area' | 'candles' | 'line'
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [chartType, setChartType] = useState('line'); // 'line' (straight line) | 'candles' (bars) | 'smooth' (spline)
   const svgRef = useRef(null);
+
+  // Reset interactive selection whenever data or period changes
+  React.useEffect(() => {
+    setSelectedIndex(null);
+    setHoverIndex(null);
+  }, [data, periodTotal]);
+
+  const effectiveIndex = hoverIndex !== null ? hoverIndex : selectedIndex;
 
   // Normalize data points
   const points = useMemo(() => {
@@ -79,9 +92,9 @@ export const StockMarketChart = ({
     return padTop + chartHeight - normalized * chartHeight;
   };
 
-  // Generate Smooth Bezier Spline Path
-  const { linePath, areaPath, coords } = useMemo(() => {
-    if (points.length === 0) return { linePath: '', areaPath: '', coords: [] };
+  // Generate Straight Line and Smooth Spline Paths
+  const { straightLinePath, straightAreaPath, smoothLinePath, smoothAreaPath, coords } = useMemo(() => {
+    if (points.length === 0) return { straightLinePath: '', straightAreaPath: '', smoothLinePath: '', smoothAreaPath: '', coords: [] };
 
     const calculatedCoords = points.map((p, i) => ({
       x: getX(i),
@@ -91,15 +104,30 @@ export const StockMarketChart = ({
 
     if (calculatedCoords.length === 1) {
       const c = calculatedCoords[0];
+      const singleLine = `M ${padLeft},${c.y} L ${svgWidth - padRight},${c.y}`;
+      const singleArea = `M ${padLeft},${c.y} L ${svgWidth - padRight},${c.y} L ${svgWidth - padRight},${padTop + chartHeight} L ${padLeft},${padTop + chartHeight} Z`;
       return {
-        linePath: `M ${padLeft},${c.y} L ${svgWidth - padRight},${c.y}`,
-        areaPath: `M ${padLeft},${c.y} L ${svgWidth - padRight},${c.y} L ${svgWidth - padRight},${padTop + chartHeight} L ${padLeft},${padTop + chartHeight} Z`,
+        straightLinePath: singleLine,
+        straightAreaPath: singleArea,
+        smoothLinePath: singleLine,
+        smoothAreaPath: singleArea,
         coords: calculatedCoords
       };
     }
 
-    // Build smooth cubic bezier curve
-    let d = `M ${calculatedCoords[0].x},${calculatedCoords[0].y}`;
+    const lastX = calculatedCoords[calculatedCoords.length - 1].x;
+    const firstX = calculatedCoords[0].x;
+    const bottomY = padTop + chartHeight;
+
+    // 1. Straight discrete point-to-point line (represents actual monthly expense totals)
+    let straightD = `M ${calculatedCoords[0].x},${calculatedCoords[0].y}`;
+    for (let i = 1; i < calculatedCoords.length; i++) {
+      straightD += ` L ${calculatedCoords[i].x},${calculatedCoords[i].y}`;
+    }
+    const straightArea = `${straightD} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
+
+    // 2. Smooth cubic bezier curve
+    let smoothD = `M ${calculatedCoords[0].x},${calculatedCoords[0].y}`;
     for (let i = 0; i < calculatedCoords.length - 1; i++) {
       const curr = calculatedCoords[i];
       const next = calculatedCoords[i + 1];
@@ -107,43 +135,64 @@ export const StockMarketChart = ({
       const cpY1 = curr.y;
       const cpX2 = curr.x + (next.x - curr.x) / 2;
       const cpY2 = next.y;
-      d += ` C ${cpX1},${cpY1} ${cpX2},${cpY2} ${next.x},${next.y}`;
+      smoothD += ` C ${cpX1},${cpY1} ${cpX2},${cpY2} ${next.x},${next.y}`;
     }
+    const smoothArea = `${smoothD} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
 
-    const lastX = calculatedCoords[calculatedCoords.length - 1].x;
-    const firstX = calculatedCoords[0].x;
-    const bottomY = padTop + chartHeight;
-    const closedArea = `${d} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
-
-    return { linePath: d, areaPath: closedArea, coords: calculatedCoords };
+    return { 
+      straightLinePath: straightD, 
+      straightAreaPath: straightArea,
+      smoothLinePath: smoothD, 
+      smoothAreaPath: smoothArea, 
+      coords: calculatedCoords 
+    };
   }, [points, maxVal, minVal]);
 
-  // Current active display point (either hovered or the latest point)
+  // Current active display point (hovered, clicked/selected, or default)
   const activeData = useMemo(() => {
     if (points.length === 0) return null;
-    if (hoverIndex !== null && points[hoverIndex]) return points[hoverIndex];
+    if (effectiveIndex !== null && points[effectiveIndex]) return points[effectiveIndex];
     return points[points.length - 1];
-  }, [points, hoverIndex]);
+  }, [points, effectiveIndex]);
 
   const activeCoord = useMemo(() => {
     if (coords.length === 0) return null;
-    if (hoverIndex !== null && coords[hoverIndex]) return coords[hoverIndex];
+    if (effectiveIndex !== null && coords[effectiveIndex]) return coords[effectiveIndex];
     return coords[coords.length - 1];
-  }, [coords, hoverIndex]);
+  }, [coords, effectiveIndex]);
 
-  // Compute percentage change between first and latest (or hovered)
+  // Compute percentage change between active and preceding point
   const statsSummary = useMemo(() => {
-    if (points.length < 2) return { change: 0, isPositive: true, diff: 0 };
-    const firstVal = points[0].amount;
-    const currentVal = activeData ? activeData.amount : points[points.length - 1].amount;
-    const diff = currentVal - firstVal;
-    const change = firstVal > 0 ? (diff / firstVal) * 100 : (diff === 0 ? 0 : 100);
+    if (points.length < 2) return { change: 0, isPositive: true, diff: 0, compLabel: '' };
+    const currentIndex = effectiveIndex !== null ? effectiveIndex : points.length - 1;
+    const currentVal = points[currentIndex]?.amount || 0;
+
+    let prevVal = 0;
+    let compLabel = '';
+    if (currentIndex > 0) {
+      prevVal = points[currentIndex - 1]?.amount || 0;
+      compLabel = `vs ${points[currentIndex - 1]?.label || 'prev'}`;
+    } else {
+      prevVal = points[0]?.amount || 0;
+      compLabel = 'baseline';
+    }
+
+    const diff = currentVal - prevVal;
+    let change = 0;
+    if (prevVal > 0) {
+      change = (diff / prevVal) * 100;
+    } else if (currentVal > 0) {
+      change = 100;
+    }
+
     return {
       change,
       isPositive: change >= 0,
-      diff
+      diff,
+      compLabel,
+      isInspecting: effectiveIndex !== null
     };
-  }, [points, activeData]);
+  }, [points, effectiveIndex]);
 
   // Handle Mouse Move for Scrubber
   const handleMouseMove = (e) => {
@@ -168,6 +217,12 @@ export const StockMarketChart = ({
 
   const handleMouseLeave = () => {
     setHoverIndex(null);
+  };
+
+  const handleSvgClick = () => {
+    if (hoverIndex !== null) {
+      setSelectedIndex(selectedIndex === hoverIndex ? null : hoverIndex);
+    }
   };
 
   // Gridline step values
@@ -216,17 +271,17 @@ export const StockMarketChart = ({
           gap: '2px'
         }}>
           <button
-            onClick={() => setChartType('area')}
+            onClick={() => setChartType('line')}
             style={{
               padding: '0.25rem 0.6rem',
               borderRadius: '5px',
               fontSize: '0.72rem',
               fontWeight: '700',
               border: 'none',
-              background: chartType === 'area' ? '#FFFFFF' : 'transparent',
-              color: chartType === 'area' ? '#0F172A' : '#64748B',
+              background: chartType === 'line' ? '#FFFFFF' : 'transparent',
+              color: chartType === 'line' ? '#0F172A' : '#64748B',
               cursor: 'pointer',
-              boxShadow: chartType === 'area' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+              boxShadow: chartType === 'line' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
               transition: 'all 0.15s ease'
             }}
           >
@@ -249,6 +304,23 @@ export const StockMarketChart = ({
           >
             Bar Chart
           </button>
+          <button
+            onClick={() => setChartType('smooth')}
+            style={{
+              padding: '0.25rem 0.6rem',
+              borderRadius: '5px',
+              fontSize: '0.72rem',
+              fontWeight: '700',
+              border: 'none',
+              background: chartType === 'smooth' ? '#FFFFFF' : 'transparent',
+              color: chartType === 'smooth' ? '#0F172A' : '#64748B',
+              cursor: 'pointer',
+              boxShadow: chartType === 'smooth' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Smooth Curve
+          </button>
         </div>
       </div>
 
@@ -261,33 +333,93 @@ export const StockMarketChart = ({
         paddingBottom: '0.75rem',
         borderBottom: '1px solid #F1F5F9'
       }}>
-        <div style={{
-          fontSize: '2rem',
-          fontWeight: '800',
-          fontFamily: 'var(--font-heading)',
-          color: '#0F172A',
-          letterSpacing: '-0.03em',
-          lineHeight: 1
-        }}>
-          {activeData ? formatCurrency(activeData.amount) : '₹0'}
-        </div>
+        {effectiveIndex !== null ? (
+          // Scrubbing / Inspected Monthly Point State
+          <>
+            <div style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              fontFamily: 'var(--font-heading)',
+              color: '#0F172A',
+              letterSpacing: '-0.03em',
+              lineHeight: 1
+            }}>
+              {activeData ? formatCurrency(activeData.amount) : '₹0'}
+            </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          fontSize: '0.85rem',
-          fontWeight: '700',
-          color: statsSummary.isPositive ? '#16A34A' : '#DC2626'
-        }}>
-          {statsSummary.isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-          <span>
-            {statsSummary.diff >= 0 ? `+${formatCurrency(statsSummary.diff)}` : formatCurrency(statsSummary.diff)} ({statsSummary.change.toFixed(1)}%)
-          </span>
-          <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: '500', marginLeft: '0.2rem' }}>
-            {activeData?.fullLabel || 'Current'}
-          </span>
-        </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.85rem',
+              fontWeight: '700',
+              color: statsSummary.isPositive ? '#16A34A' : '#DC2626'
+            }}>
+              {statsSummary.isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+              <span>
+                {statsSummary.diff >= 0 ? `+${formatCurrency(statsSummary.diff)}` : formatCurrency(statsSummary.diff)} ({statsSummary.change.toFixed(1)}%)
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#0284C7', background: '#F0F9FF', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: '600', marginLeft: '0.2rem' }}>
+                MoM {statsSummary.compLabel} • {activeData?.fullLabel} {selectedIndex !== null && hoverIndex === null ? '(Selected Month)' : '(Inspecting)'}
+              </span>
+              {selectedIndex !== null && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedIndex(null); }}
+                  style={{
+                    background: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    padding: '0.15rem 0.45rem',
+                    cursor: 'pointer',
+                    color: '#475569',
+                    marginLeft: '0.3rem',
+                    fontWeight: '600'
+                  }}
+                  title="Reset to full period summary"
+                >
+                  ✕ Reset to Full Period
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          // Default / Cumulative Period State
+          <>
+            <div style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              fontFamily: 'var(--font-heading)',
+              color: '#0F172A',
+              letterSpacing: '-0.03em',
+              lineHeight: 1
+            }}>
+              {periodTotal !== null ? formatCurrency(periodTotal) : (activeData ? formatCurrency(activeData.amount) : '₹0')}
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.85rem',
+              fontWeight: '700'
+            }}>
+              {periodDelta !== null ? (
+                <span style={{ color: periodDelta >= 0 ? '#16A34A' : '#DC2626', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                  {periodDelta >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                  {periodDelta >= 0 ? `+${periodDelta.toFixed(1)}%` : `${periodDelta.toFixed(1)}%`} vs {periodDeltaLabel || 'baseline'}
+                </span>
+              ) : (
+                <span style={{ color: '#64748B', fontWeight: '600' }}>
+                  {periodDeltaLabel ? `No spend recorded in ${periodDeltaLabel}` : (periodLabel ? `${periodLabel}` : '')}
+                </span>
+              )}
+              <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: '500', marginLeft: '0.3rem' }}>
+                • {periodLabel ? `${periodLabel} (Cumulative)` : (activeData?.fullLabel || 'Current')}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Interactive Stock Market SVG Surface */}
@@ -300,9 +432,10 @@ export const StockMarketChart = ({
           <svg
             ref={svgRef}
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            style={{ width: '100%', height: 'auto', display: 'block', cursor: 'crosshair' }}
+            style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer' }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
+            onClick={handleSvgClick}
           >
             <defs>
               {/* Vibrant Stock Market Area Gradient */}
@@ -353,19 +486,16 @@ export const StockMarketChart = ({
               </g>
             ))}
 
-            {/* CHART TYPE 1: Stock Market Area Spline Flow */}
-            {chartType === 'area' && (
+            {/* CHART TYPE 1: Straight Point-to-Point Line (Default: discrete monthly totals) */}
+            {chartType === 'line' && (
               <>
-                {/* Gradient Fill Under Curve */}
                 <path
-                  d={areaPath}
+                  d={straightAreaPath}
                   fill="url(#stockAreaGradient)"
                   style={{ transition: 'all 0.3s ease' }}
                 />
-
-                {/* Main Vibrant Trendline */}
                 <path
-                  d={linePath}
+                  d={straightLinePath}
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth="2.5"
@@ -373,19 +503,53 @@ export const StockMarketChart = ({
                   strokeLinejoin="round"
                   filter="url(#glow)"
                 />
-
-                {/* Permanent Data Marker Points */}
                 {coords.map((c, i) => {
-                  const isHovered = hoverIndex === i;
+                  const isInspected = effectiveIndex === i;
                   return (
                     <g key={i}>
                       <circle
                         cx={c.x}
                         cy={c.y}
-                        r={isHovered ? 6 : 3.5}
-                        fill="#FFFFFF"
-                        stroke={strokeColor}
-                        strokeWidth={isHovered ? 3 : 2}
+                        r={isInspected ? 6.5 : 4}
+                        fill={selectedIndex === i ? '#10B981' : '#FFFFFF'}
+                        stroke={selectedIndex === i ? '#FFFFFF' : strokeColor}
+                        strokeWidth={isInspected ? 3 : 2.5}
+                        style={{ transition: 'all 0.15s ease' }}
+                      />
+                    </g>
+                  );
+                })}
+              </>
+            )}
+
+            {/* CHART TYPE 3: Smooth Spline Curve */}
+            {chartType === 'smooth' && (
+              <>
+                <path
+                  d={smoothAreaPath}
+                  fill="url(#stockAreaGradient)"
+                  style={{ transition: 'all 0.3s ease' }}
+                />
+                <path
+                  d={smoothLinePath}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#glow)"
+                />
+                {coords.map((c, i) => {
+                  const isInspected = effectiveIndex === i;
+                  return (
+                    <g key={i}>
+                      <circle
+                        cx={c.x}
+                        cy={c.y}
+                        r={isInspected ? 6.5 : 3.5}
+                        fill={selectedIndex === i ? '#10B981' : '#FFFFFF'}
+                        stroke={selectedIndex === i ? '#FFFFFF' : strokeColor}
+                        strokeWidth={isInspected ? 3 : 2}
                         style={{ transition: 'all 0.15s ease' }}
                       />
                     </g>
@@ -400,7 +564,7 @@ export const StockMarketChart = ({
                 {coords.map((c, i) => {
                   const barWidth = Math.min(36, (chartWidth / coords.length) * 0.55);
                   const barHeight = Math.max(6, padTop + chartHeight - c.y);
-                  const isHovered = hoverIndex === i || (hoverIndex === null && i === coords.length - 1);
+                  const isBarActive = effectiveIndex === i;
 
                   return (
                     <g key={i}>
@@ -410,7 +574,7 @@ export const StockMarketChart = ({
                         y1={Math.max(padTop, c.y - 12)}
                         x2={c.x}
                         y2={padTop + chartHeight}
-                        stroke={isHovered ? '#10B981' : '#CBD5E1'}
+                        stroke={isBarActive ? '#10B981' : '#CBD5E1'}
                         strokeWidth="1.5"
                       />
                       {/* Candlestick Body */}
@@ -420,7 +584,7 @@ export const StockMarketChart = ({
                         width={barWidth}
                         height={barHeight}
                         rx="4"
-                        fill={isHovered ? 'url(#barGradientActive)' : 'url(#barGradientInactive)'}
+                        fill={isBarActive ? 'url(#barGradientActive)' : 'url(#barGradientInactive)'}
                         style={{ transition: 'all 0.2s ease' }}
                       />
                     </g>
@@ -429,8 +593,8 @@ export const StockMarketChart = ({
               </g>
             )}
 
-            {/* Interactive Vertical Scrubber Crosshair */}
-            {activeCoord && (
+            {/* Interactive Vertical Scrubber Crosshair (Displayed only when inspecting or selecting a month) */}
+            {effectiveIndex !== null && activeCoord && (
               <g>
                 <line
                   x1={activeCoord.x}

@@ -24,7 +24,7 @@ services:
       retries: 5
 
   # ==========================================================
-  # Eureka Discovery Server (:8761)
+  # Eureka Discovery Server (:9000)
   # ==========================================================
   eureka-server:
     build:
@@ -33,11 +33,11 @@ services:
     container_name: spendwise-eureka
     restart: on-failure
     ports:
-      - "8761:8761"
+      - "9000:9000"
     networks:
       - spendwise-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -57,7 +57,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/spendwise_auth?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:9000/eureka/
     depends_on:
       mysql-db:
         condition: service_healthy
@@ -81,7 +81,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/spendwise_category?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:9000/eureka/
     depends_on:
       mysql-db:
         condition: service_healthy
@@ -105,7 +105,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/spendwise_expense?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:9000/eureka/
     depends_on:
       mysql-db:
         condition: service_healthy
@@ -129,7 +129,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/spendwise_report?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:9000/eureka/
     depends_on:
       mysql-db:
         condition: service_healthy
@@ -150,7 +150,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:9000/eureka/
     depends_on:
       eureka-server:
         condition: service_started

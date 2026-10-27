@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
 import { getPasswordRuleResults, isStrongPassword } from '../utils/passwordValidation';
 import { formatDate } from '../utils/formatDate';
 import { 
@@ -109,6 +110,17 @@ export const Profile = () => {
         passwordForm.newPassword
       );
       setPasswordSuccess('Password changed successfully! Please use your new password next time you sign in.');
+
+      // Security Notification
+      notificationService.createNotification({
+        title: 'Your password was changed successfully',
+        message: 'Your account credentials were updated. If you did not make this change, please contact support immediately.',
+        category: 'SECURITY',
+        severity: 'CRITICAL',
+        actionUrl: 'profile',
+        metadata: { event: 'PASSWORD_CHANGED', timestamp: new Date().toISOString() }
+      });
+
       setPasswordForm({
         currentPassword: '',
         newPassword: '',
@@ -477,7 +489,7 @@ export const Profile = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
               {[
-                { name: 'Eureka Service Discovery', port: '8761', icon: Cpu, color: '#10B981' },
+                { name: 'Eureka Service Discovery', port: '9000', icon: Cpu, color: '#10B981' },
                 { name: 'API Gateway (Edge Router)', port: '8080', icon: Layers, color: '#4F46E5' },
                 { name: 'Auth Service (JWT Engine)', port: '8081', icon: Shield, color: '#10B981' },
                 { name: 'Category Service (Budget Engine)', port: '8082', icon: Database, color: '#10B981' },

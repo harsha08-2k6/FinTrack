@@ -5,7 +5,27 @@ import { formatDate } from '../utils/formatDate';
 
 export const ExpenseCard = ({ expense, onDelete, onClick, onViewReceipt }) => {
   const categoryColor = expense.category?.colorCode || '#10B981';
-  const categoryName = expense.category?.name || 'General';
+  const rawCatName = expense.category?.name || 'General';
+
+  const formatCatName = (name) => {
+    if (!name) return 'General';
+    if (/^[A-Z0-9_]+$/.test(name)) {
+      return name.toLowerCase().split('_').map(w => w === 'and' ? '&' : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+    return name;
+  };
+  const categoryName = formatCatName(rawCatName);
+
+  const formatPayment = (method) => {
+    const map = {
+      CARD: 'Card',
+      UPI: 'UPI',
+      CASH: 'Cash',
+      BANK_TRANSFER: 'Bank Transfer',
+      OTHER: 'Other'
+    };
+    return map[method] || method;
+  };
 
   return (
     <div 
@@ -51,7 +71,7 @@ export const ExpenseCard = ({ expense, onDelete, onClick, onViewReceipt }) => {
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <CreditCard size={13} />
-              {expense.paymentMethod || 'CARD'}
+              {formatPayment(expense.paymentMethod || 'CARD')}
             </span>
             <span 
               className="badge" 

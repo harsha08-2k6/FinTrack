@@ -7,6 +7,7 @@ export const MetricStatCard = ({
   value, 
   subtext, 
   change, 
+  changeLabel,
   icon: Icon, 
   valueColor = '#0F172A',
   iconBg = '#F1F5F9',
@@ -24,7 +25,8 @@ export const MetricStatCard = ({
       boxShadow: 'var(--shadow-xs)',
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'space-between'
+      justifyContent: 'space-between',
+      height: '100%'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <span style={{ fontSize: '0.95rem', fontWeight: '600', color: '#64748B' }}>
@@ -55,18 +57,21 @@ export const MetricStatCard = ({
         {typeof value === 'number' ? formatCurrency(value) : value}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}>
-        {change !== undefined && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+        {change !== undefined && change !== null && !isNaN(change) && (
           <span style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '2px',
-            color: change < 0 ? '#DC2626' : '#16A34A',
+            color: change < 0 ? '#DC2626' : (change > 0 ? '#16A34A' : '#64748B'),
             fontWeight: '700'
           }}>
-            {change < 0 ? <TrendingDown size={14} color="#DC2626" /> : <TrendingUp size={14} color="#16A34A" />}
+            {change < 0 ? <TrendingDown size={14} color="#DC2626" /> : (change > 0 ? <TrendingUp size={14} color="#16A34A" /> : null)}
             {formatPercentage(change)}
           </span>
+        )}
+        {changeLabel && (
+          <span style={{ color: '#64748B', fontSize: '0.8rem' }}>{changeLabel}</span>
         )}
         {subtext && <span style={{ color: '#64748B' }}>{subtext}</span>}
       </div>

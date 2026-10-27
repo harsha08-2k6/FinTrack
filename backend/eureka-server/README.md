@@ -2,8 +2,8 @@
 
 SpendWise uses Spring Cloud Netflix Eureka for service registry and discovery.
 
-- **Port**: `8761`
-- **Dashboard**: [http://localhost:8761](http://localhost:8761)
+- **Port**: `9000`
+- **Dashboard**: [http://localhost:9000](http://localhost:9000)
 
 ### Running
 ```bash

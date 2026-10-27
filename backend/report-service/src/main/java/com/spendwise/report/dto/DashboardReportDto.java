@@ -13,6 +13,7 @@ public class DashboardReportDto {
     private String topSpendingCategory;
     private BigDecimal topSpendingCategoryAmount;
     private List<CategoryBreakdownDto> categoryBreakdowns;
+    private List<CategoryBreakdownDto> currentMonthCategoryBreakdowns;
     private List<MonthlyTrendDto> monthlyTrends;
 
     // Income & Savings Pillars
@@ -52,6 +53,9 @@ public class DashboardReportDto {
 
     public List<CategoryBreakdownDto> getCategoryBreakdowns() { return categoryBreakdowns; }
     public void setCategoryBreakdowns(List<CategoryBreakdownDto> categoryBreakdowns) { this.categoryBreakdowns = categoryBreakdowns; }
+
+    public List<CategoryBreakdownDto> getCurrentMonthCategoryBreakdowns() { return currentMonthCategoryBreakdowns; }
+    public void setCurrentMonthCategoryBreakdowns(List<CategoryBreakdownDto> currentMonthCategoryBreakdowns) { this.currentMonthCategoryBreakdowns = currentMonthCategoryBreakdowns; }
 
     public List<MonthlyTrendDto> getMonthlyTrends() { return monthlyTrends; }
     public void setMonthlyTrends(List<MonthlyTrendDto> monthlyTrends) { this.monthlyTrends = monthlyTrends; }

@@ -32,10 +32,11 @@ public class ReportController {
     @GetMapping("/category-breakdown")
     public ResponseEntity<List<CategoryBreakdownDto>> getCategoryBreakdown(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false, defaultValue = "1") Long paramUserId
+            @RequestParam(value = "userId", required = false, defaultValue = "1") Long paramUserId,
+            @RequestParam(value = "yearMonth", required = false) String yearMonth
     ) {
         Long userId = headerUserId != null ? headerUserId : paramUserId;
-        return ResponseEntity.ok(reportService.getCategoryBreakdown(userId));
+        return ResponseEntity.ok(reportService.getCategoryBreakdown(userId, yearMonth));
     }
 
     @GetMapping("/monthly-trends")

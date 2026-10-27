@@ -97,6 +97,12 @@ function getLocalTransactions(params = {}) {
     if (params.categoryId) {
       list = list.filter(t => String(t.categoryId) === String(params.categoryId));
     }
+    if (params.startDate) {
+      list = list.filter(t => (t.transactionDate || t.expenseDate || '') >= params.startDate);
+    }
+    if (params.endDate) {
+      list = list.filter(t => (t.transactionDate || t.expenseDate || '') <= params.endDate);
+    }
     return list;
   } catch {
     return [];
@@ -110,11 +116,31 @@ function saveLocalTransaction(data) {
     const newTx = {
       id: Date.now(),
       ...data,
-      transactionDate: data.transactionDate || new Date().toISOString().split('T')[0],
+      amount: parseFloat(data.amount) || 0,
+      transactionDate: data.transactionDate || data.expenseDate || new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString()
     };
     list.unshift(newTx);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+
+    // If it's an expense, also sync into fintrack_local_expenses
+    if (data.type === 'EXPENSE') {
+      try {
+        const expRaw = localStorage.getItem('fintrack_local_expenses');
+        const expList = expRaw ? JSON.parse(expRaw) : [];
+        const catRaw = localStorage.getItem('fintrack_local_categories');
+        const catList = catRaw ? JSON.parse(catRaw) : [];
+        const catObj = catList.find(c => String(c.id) === String(data.categoryId));
+
+        expList.unshift({
+          ...newTx,
+          expenseDate: newTx.transactionDate,
+          category: catObj || (data.category || null)
+        });
+        localStorage.setItem('fintrack_local_expenses', JSON.stringify(expList));
+      } catch {}
+    }
+
     return newTx;
   } catch {
     return { id: Date.now(), ...data };

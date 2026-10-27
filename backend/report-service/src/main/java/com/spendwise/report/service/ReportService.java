@@ -108,12 +108,17 @@ public class ReportService {
                 : BigDecimal.ZERO;
 
         List<CategoryBreakdownDto> categoryBreakdowns = calculateCategoryBreakdown(expenses);
+        List<CategoryBreakdownDto> currentMonthCategoryBreakdowns = calculateCategoryBreakdown(currentMonthExpenses);
         List<MonthlyTrendDto> monthlyTrends = calculateMonthlyTrends(expenses);
         List<MonthlyTrendDto> incomeTrends = calculateMonthlyTrends(incomeList);
 
         String topCatName = "None";
         BigDecimal topCatAmount = BigDecimal.ZERO;
-        if (!categoryBreakdowns.isEmpty()) {
+        if (!currentMonthCategoryBreakdowns.isEmpty()) {
+            CategoryBreakdownDto top = currentMonthCategoryBreakdowns.get(0);
+            topCatName = top.getCategoryName();
+            topCatAmount = top.getTotalAmount();
+        } else if (!categoryBreakdowns.isEmpty()) {
             CategoryBreakdownDto top = categoryBreakdowns.get(0);
             topCatName = top.getCategoryName();
             topCatAmount = top.getTotalAmount();
@@ -129,6 +134,7 @@ public class ReportService {
         report.setTopSpendingCategory(topCatName);
         report.setTopSpendingCategoryAmount(topCatAmount);
         report.setCategoryBreakdowns(categoryBreakdowns);
+        report.setCurrentMonthCategoryBreakdowns(currentMonthCategoryBreakdowns);
         report.setMonthlyTrends(monthlyTrends);
 
         report.setTotalIncomeAllTime(totalIncomeAllTime);
@@ -142,10 +148,26 @@ public class ReportService {
     }
 
     public List<CategoryBreakdownDto> getCategoryBreakdown(Long userId) {
+        return getCategoryBreakdown(userId, null);
+    }
+
+    public List<CategoryBreakdownDto> getCategoryBreakdown(Long userId, String yearMonthStr) {
         List<ExpenseDto> transactions = fetchExpensesForUser(userId);
         List<ExpenseDto> expenses = transactions.stream()
                 .filter(t -> !"INCOME".equalsIgnoreCase(t.getType()))
                 .collect(Collectors.toList());
+
+        if (yearMonthStr != null && !yearMonthStr.trim().isEmpty()) {
+            try {
+                YearMonth targetYm = YearMonth.parse(yearMonthStr.trim());
+                expenses = expenses.stream()
+                        .filter(e -> e.getExpenseDate() != null && YearMonth.from(e.getExpenseDate()).equals(targetYm))
+                        .collect(Collectors.toList());
+            } catch (Exception ignored) {
+                // If invalid yearMonth provided, fall back to unfiltered
+            }
+        }
+
         return calculateCategoryBreakdown(expenses);
     }
 

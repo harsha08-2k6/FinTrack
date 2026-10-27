@@ -1,0 +1,153 @@
+services:
+  # ==========================================
+  # Eureka Server
+  # ==========================================
+  - type: web
+    name: eureka-server
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/eureka-server
+    healthCheckPath: /actuator/health
+    
+  # ==========================================
+  # API Gateway
+  # ==========================================
+  - type: web
+    name: api-gateway
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/api-gateway
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: https://eureka-server.onrender.com/eureka/
+
+  # ==========================================
+  # Auth Service
+  # ==========================================
+  - type: web
+    name: auth-service
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/auth-service
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: https://eureka-server.onrender.com/eureka/
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://db.iopschksmghvgfctefuq.supabase.co:5432/postgres
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        value: "tsivaharshavardhanreddy08@gmail.com"
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        value: "tsivaharshavardhanreddy08@gmail.com"
+      - key: SMTP_ENABLED
+        value: "true"
+      - key: FRONTEND_URL
+        value: "http://localhost:5173"
+      - key: PASSWORD_RESET_TOKEN_TTL_MINUTES
+        value: "30"
+        
+  # ==========================================
+  # Category Service
+  # ==========================================
+  - type: web
+    name: category-service
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/category-service
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: https://eureka-server.onrender.com/eureka/
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://db.iopschksmghvgfctefuq.supabase.co:5432/postgres
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ==========================================
+  # Expense Service
+  # ==========================================
+  - type: web
+    name: expense-service
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/expense-service
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: https://eureka-server.onrender.com/eureka/
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://db.iopschksmghvgfctefuq.supabase.co:5432/postgres
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ==========================================
+  # Report Service
+  # ==========================================
+  - type: web
+    name: report-service
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/report-service
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: https://eureka-server.onrender.com/eureka/
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://db.iopschksmghvgfctefuq.supabase.co:5432/postgres
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ==========================================
+  # Transaction Service
+  # ==========================================
+  - type: web
+    name: transaction-service
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend/transaction-service
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: https://eureka-server.onrender.com/eureka/
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://db.iopschksmghvgfctefuq.supabase.co:5432/postgres
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        value: "tsivaharshavardhanreddy08@gmail.com"
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        value: "tsivaharshavardhanreddy08@gmail.com"
+      - key: SMTP_ENABLED
+        value: "true"

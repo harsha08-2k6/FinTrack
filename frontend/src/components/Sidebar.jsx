@@ -66,6 +66,7 @@ export const Sidebar = ({ activePage, setActivePage }) => {
       position: 'sticky',
       top: 0,
       height: '100vh',
+      minHeight: '100%',
       overflowY: 'auto',
       zIndex: 30,
       userSelect: 'none'

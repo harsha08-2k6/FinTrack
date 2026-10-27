@@ -20,7 +20,9 @@ import {
   Trash2,
   Pencil,
   Tag,
-  Paperclip
+  Paperclip,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
@@ -37,6 +39,16 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
   const [endDate, setEndDate] = useState('');
   const [datePreset, setDatePreset] = useState('ALL');
   const [loading, setLoading] = useState(true);
+
+  // Notifications banner state (success / error feedback)
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification(prev => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
 
   // Quick Inflow Modal
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -56,14 +68,8 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (selectedType !== 'ALL') params.type = selectedType;
-      if (selectedCategory) params.categoryId = selectedCategory;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
       const [txData, categoryData] = await Promise.all([
-        transactionService.getAllTransactions(params).catch(() => []),
+        transactionService.getAllTransactions().catch(() => []),
         categoryService.getAllCategories().catch(() => [])
       ]);
 
@@ -74,6 +80,7 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
       setCategories(catList);
     } catch (err) {
       console.error('Error fetching transactions:', err);
+      showNotification('error', 'Failed to load transaction history.');
     } finally {
       setLoading(false);
     }
@@ -81,7 +88,7 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
 
   useEffect(() => {
     fetchTransactions();
-  }, [selectedType, selectedCategory, startDate, endDate]);
+  }, []);
 
   const applyDatePreset = (preset) => {
     setDatePreset(preset);
@@ -110,13 +117,15 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this transaction record?')) {
+  const handleDelete = async (id, title) => {
+    const recordLabel = title ? `"${title}"` : 'this transaction';
+    if (window.confirm(`Are you sure you want to delete ${recordLabel}? This action cannot be undone.`)) {
       try {
         await transactionService.deleteTransaction(id);
-        fetchTransactions();
+        await fetchTransactions();
+        showNotification('success', `Transaction ${recordLabel} was successfully deleted.`);
       } catch (err) {
-        alert('Failed to delete transaction: ' + err.message);
+        showNotification('error', 'Failed to delete transaction: ' + (err.message || 'Unknown error'));
       }
     }
   };
@@ -148,10 +157,13 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
         paymentMethod: editingTransaction.paymentMethod,
         description: editingTransaction.description || ''
       });
+      const updatedTitle = editingTransaction.title.trim();
       setEditingTransaction(null);
       await fetchTransactions();
+      showNotification('success', `Transaction "${updatedTitle}" updated successfully.`);
     } catch (err) {
       setEditError(err.message || 'Unable to update this transaction.');
+      showNotification('error', 'Failed to update transaction.');
     } finally {
       setSavingEdit(false);
     }
@@ -167,6 +179,7 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
         paymentMethod: incomeForm.paymentMethod,
         transactionDate: incomeForm.transactionDate
       });
+      const loggedTitle = incomeForm.title.trim();
       setIsIncomeModalOpen(false);
       setIncomeForm({
         title: 'Monthly Salary',
@@ -174,24 +187,95 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
         paymentMethod: 'BANK_TRANSFER',
         transactionDate: new Date().toISOString().split('T')[0]
       });
-      fetchTransactions();
+      await fetchTransactions();
+      showNotification('success', `Income "${loggedTitle}" recorded successfully.`);
     } catch (err) {
-      alert('Failed to record income: ' + err.message);
+      showNotification('error', 'Failed to record income: ' + (err.message || 'Unknown error'));
     }
   };
 
-  // Filtered in-memory for fast search and payment channels
+  // Sorting & Pagination State
+  const [sortField, setSortField] = useState('date'); // 'date' | 'amount' | 'title'
+  const [sortDirection, setSortDirection] = useState('desc'); // 'asc' | 'desc'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSelectedType('ALL');
+    setSelectedCategory('');
+    setSelectedPayment('ALL');
+    setDatePreset('ALL');
+    setStartDate('');
+    setEndDate('');
+    setCurrentPage(1);
+  };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1);
+  };
+
+  // Filtered and sorted transactions
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    const list = transactions.filter((t) => {
+      // Search query filter
       const matchSearch = searchTerm === '' ||
         (t.title && t.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (t.description && t.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
+      // Flow type filter (INCOME vs EXPENSE)
+      const matchType = selectedType === 'ALL' || t.type === selectedType;
+
+      // Category filter (only applies to expenses or categorized transactions)
+      const tCatId = t.categoryId || t.category?.id;
+      const matchCategory = !selectedCategory || (tCatId && String(tCatId) === String(selectedCategory));
+
+      // Payment method filter
       const matchPayment = selectedPayment === 'ALL' || t.paymentMethod === selectedPayment;
 
-      return matchSearch && matchPayment;
+      // Date range filter
+      const tDate = t.transactionDate || t.expenseDate || '';
+      const matchStartDate = !startDate || tDate >= startDate;
+      const matchEndDate = !endDate || tDate <= endDate;
+
+      return matchSearch && matchType && matchCategory && matchPayment && matchStartDate && matchEndDate;
     });
-  }, [transactions, searchTerm, selectedPayment]);
+
+    return list.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'date') {
+        const dateA = new Date(a.transactionDate || a.expenseDate || 0).getTime();
+        const dateB = new Date(b.transactionDate || b.expenseDate || 0).getTime();
+        comparison = dateA - dateB;
+      } else if (sortField === 'amount') {
+        comparison = (parseFloat(a.amount) || 0) - (parseFloat(b.amount) || 0);
+      } else if (sortField === 'title') {
+        comparison = (a.title || '').localeCompare(b.title || '');
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [transactions, searchTerm, selectedType, selectedCategory, selectedPayment, startDate, endDate, sortField, sortDirection]);
+
+  // Paginated records
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+
+  // Automatically adjust currentPage if it exceeds totalPages due to filtering or record deletion
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTransactions.slice(start, start + pageSize);
+  }, [filteredTransactions, currentPage, pageSize]);
 
   // Statistics Calculation: Inflow, Outflow, Net Balance
   const stats = useMemo(() => {
@@ -223,24 +307,87 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
     };
   }, [filteredTransactions]);
 
+  // Helper to normalize and prettify category names (e.g. 'EDUCATION' -> 'Education', 'HOUSING_AND_BILLS' -> 'Housing & Bills')
+  const formatCategoryName = (name) => {
+    if (!name) return 'General';
+    // If it's already mixed case with spaces (like "Housing & Bills" or "Education"), return clean
+    if (/^[A-Z0-9_]+$/.test(name)) {
+      return name
+        .toLowerCase()
+        .split('_')
+        .map(word => {
+          if (word === 'and') return '&';
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' ');
+    }
+    return name;
+  };
+
+  // Helper to standardize payment labels (e.g. 'BANK_TRANSFER' -> 'Bank Transfer', 'CARD' -> 'Card', 'UPI' -> 'UPI')
+  const formatPaymentMethod = (method) => {
+    if (!method) return 'Card';
+    const map = {
+      BANK_TRANSFER: 'Bank Transfer',
+      CARD: 'Card',
+      UPI: 'UPI',
+      CASH: 'Cash'
+    };
+    return map[method] || method.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
+
   const handleExportCSV = () => {
     const columns = [
       { key: 'transactionDate', label: 'Date', formatter: (i) => i.transactionDate || i.expenseDate },
       { key: 'type', label: 'Flow Type' },
       { key: 'title', label: 'Title / Description' },
-      { key: 'categoryName', label: 'Category', formatter: (i) => i.category?.name || (i.type === 'INCOME' ? 'Income' : 'General') },
-      { key: 'paymentMethod', label: 'Payment Channel' },
+      { key: 'categoryName', label: 'Category', formatter: (i) => i.type === 'INCOME' ? 'Salary / Income' : formatCategoryName(i.category?.name) },
+      { key: 'paymentMethod', label: 'Payment Channel', formatter: (i) => formatPaymentMethod(i.paymentMethod) },
       { key: 'amount', label: 'Amount (₹)', formatter: (i) => parseFloat(i.amount || 0).toFixed(2) }
     ];
-    exportToCSV(filteredTransactions, 'FinTrack_Complete_Transaction_History.csv', columns);
+    exportToCSV(filteredTransactions, 'FinTrack_Transactions.csv', columns);
   };
 
   const handleExportJSON = () => {
-    exportToJSON(filteredTransactions, 'FinTrack_Transactions.json');
+    const formattedData = filteredTransactions.map(tx => ({
+      ...tx,
+      categoryName: tx.type === 'INCOME' ? 'Salary / Income' : formatCategoryName(tx.category?.name),
+      formattedPaymentMethod: formatPaymentMethod(tx.paymentMethod)
+    }));
+    exportToJSON(formattedData, 'FinTrack_Transactions.json');
   };
 
   return (
     <div className="page-wrapper">
+      {/* Toast Notification for CRUD feedback */}
+      {notification && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.65rem',
+          padding: '0.75rem 1.25rem',
+          marginBottom: '1.25rem',
+          borderRadius: '8px',
+          background: notification.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+          border: `1px solid ${notification.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+          color: notification.type === 'success' ? '#065F46' : '#991B1B',
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+          transition: 'all 0.2s ease-in-out'
+        }}>
+          {notification.type === 'success' ? <CheckCircle size={18} color="#10B981" /> : <AlertCircle size={18} color="#EF4444" />}
+          <div style={{ flex: 1 }}>{notification.message}</div>
+          <button
+            onClick={() => setNotification(null)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center' }}
+            title="Dismiss notification"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Header & Quick Action Buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -256,17 +403,17 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
           <button
             onClick={handleExportCSV}
             className="btn btn-secondary"
-            title="Export CSV"
+            title={`Export all ${filteredTransactions.length} filtered records to CSV`}
             style={{ fontSize: '0.825rem', padding: '0.5rem 0.8rem' }}
           >
             <FileSpreadsheet size={15} color="#10B981" />
-            <span>Export CSV</span>
+            <span>Export Filtered CSV ({filteredTransactions.length})</span>
           </button>
 
           <button
             onClick={handleExportJSON}
             className="btn btn-secondary"
-            title="Export JSON"
+            title={`Export all ${filteredTransactions.length} filtered records to JSON`}
             style={{ fontSize: '0.825rem', padding: '0.5rem 0.8rem' }}
           >
             <FileCode size={15} color="#6366F1" />
@@ -296,28 +443,32 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
       {/* 4 SUMMARY STATS RIBBON: Inflow, Outflow, Net Balance, Total Count */}
       <div className="stats-ribbon" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         <div className="stat-item">
-          <span className="stat-label">Total Income</span>
+          <span className="stat-label">
+            {selectedType === 'EXPENSE' ? 'Total Income (Filtered: None)' : 'Total Income (Filtered)'}
+          </span>
           <span className="stat-value" style={{ color: '#10B981' }}>
             +{formatCurrency(stats.inflow)}
           </span>
         </div>
 
         <div className="stat-item">
-          <span className="stat-label">Total Expenses</span>
+          <span className="stat-label">
+            {selectedType === 'INCOME' ? 'Total Expenses (Filtered: None)' : 'Total Expenses (Filtered)'}
+          </span>
           <span className="stat-value" style={{ color: '#0F172A' }}>
             -{formatCurrency(stats.outflow)}
           </span>
         </div>
 
         <div className="stat-item">
-          <span className="stat-label">Net Balance</span>
+          <span className="stat-label">Net Balance (Filtered)</span>
           <span className="stat-value" style={{ color: stats.net >= 0 ? '#10B981' : '#DC2626' }}>
             {stats.net >= 0 ? '+' : ''}{formatCurrency(stats.net)}
           </span>
         </div>
 
         <div className="stat-item">
-          <span className="stat-label">Total Records</span>
+          <span className="stat-label">Total Records (Filtered)</span>
           <span className="stat-value" style={{ fontSize: '1.2rem' }}>
             {stats.totalCount} records <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: '500' }}>({stats.incomeCount} In • {stats.expenseCount} Out)</span>
           </span>
@@ -360,7 +511,7 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
             <option value="">All Categories ({categories.length})</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.name}
+                {formatCategoryName(cat.name)}
               </option>
             ))}
           </select>
@@ -379,25 +530,36 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
           </select>
         </div>
 
-        {/* Date Presets Row */}
-        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginRight: '0.35rem' }}>
-            Period:
-          </span>
-          {[
-            { id: 'ALL', label: 'All Time' },
-            { id: 'THIS_MONTH', label: 'This Month' },
-            { id: 'LAST_30', label: 'Last 30 Days' },
-            { id: 'THIS_YEAR', label: 'This Year' }
-          ].map(p => (
-            <button
-              key={p.id}
-              onClick={() => applyDatePreset(p.id)}
-              className={`pill-btn ${datePreset === p.id ? 'active' : ''}`}
-            >
-              {p.label}
-            </button>
-          ))}
+        {/* Date Presets Row & Reset Button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginRight: '0.35rem' }}>
+              Period:
+            </span>
+            {[
+              { id: 'ALL', label: 'All Time' },
+              { id: 'THIS_MONTH', label: 'This Month' },
+              { id: 'LAST_30', label: 'Last 30 Days' },
+              { id: 'THIS_YEAR', label: 'This Year' }
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => applyDatePreset(p.id)}
+                className={`pill-btn ${datePreset === p.id ? 'active' : ''}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={resetFilters}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', color: '#64748B' }}
+          >
+            <X size={13} style={{ marginRight: '4px' }} />
+            Reset Filters
+          </button>
         </div>
       </div>
 
@@ -416,128 +578,223 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
             <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#0F172A', marginBottom: '0.35rem' }}>
               No Transactions Found
             </h3>
-            <p style={{ color: '#64748B', fontSize: '0.85rem', maxWidth: '420px', margin: '0 auto 1.5rem auto' }}>
+            <p style={{ color: '#64748B', fontSize: '0.85rem', maxWidth: '420px', margin: '0 auto 1.25rem auto' }}>
               No inflows or outflows matched your active search and filter criteria.
             </p>
+            <button
+              onClick={resetFilters}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.825rem', padding: '0.45rem 1rem', margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <X size={14} />
+              <span>Reset All Filters</span>
+            </button>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B' }}>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600' }}>Title & Description</th>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600' }}>Category / Flow</th>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600' }}>Date</th>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600' }}>Channel</th>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600', textAlign: 'right' }}>Amount</th>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600', textAlign: 'center' }}>Receipt</th>
-                  <th style={{ padding: '1rem 1.25rem', fontWeight: '600', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map((tx) => {
-                  const isIncome = tx.type === 'INCOME';
-                  const catName = tx.category?.name || (isIncome ? 'Salary / Income' : 'General');
-                  const catColor = tx.category?.colorCode || (isIncome ? '#10B981' : '#64748B');
-
-                  return (
-                    <tr 
-                      key={tx.id} 
-                      style={{ borderBottom: '1px solid #F1F5F9', transition: 'var(--transition)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8FAFC'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B' }}>
+                    <th 
+                      style={{ padding: '1rem 1.25rem', fontWeight: '600', cursor: 'pointer' }}
+                      onClick={() => handleSort('title')}
                     >
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <div style={{ fontWeight: '700', color: '#0F172A' }}>{tx.title}</div>
-                        {tx.description && (
-                          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
-                            {tx.description}
-                          </div>
-                        )}
-                      </td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        Title & Description
+                        <ArrowUpDown size={12} color={sortField === 'title' ? '#0F172A' : '#94A3B8'} />
+                      </div>
+                    </th>
+                    <th style={{ padding: '1rem 1.25rem', fontWeight: '600' }}>Category / Flow</th>
+                    <th 
+                      style={{ padding: '1rem 1.25rem', fontWeight: '600', cursor: 'pointer' }}
+                      onClick={() => handleSort('date')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        Date
+                        <ArrowUpDown size={12} color={sortField === 'date' ? '#0F172A' : '#94A3B8'} />
+                      </div>
+                    </th>
+                    <th style={{ padding: '1rem 1.25rem', fontWeight: '600' }}>Channel</th>
+                    <th 
+                      style={{ padding: '1rem 1.25rem', fontWeight: '600', textAlign: 'right', cursor: 'pointer' }}
+                      onClick={() => handleSort('amount')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                        Amount
+                        <ArrowUpDown size={12} color={sortField === 'amount' ? '#0F172A' : '#94A3B8'} />
+                      </div>
+                    </th>
+                    <th style={{ padding: '1rem 1.25rem', fontWeight: '600', textAlign: 'center' }}>Receipt</th>
+                    <th style={{ padding: '1rem 1.25rem', fontWeight: '600', textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedTransactions.map((tx) => {
+                    const isIncome = tx.type === 'INCOME';
+                    const catName = isIncome ? 'Salary / Income' : formatCategoryName(tx.category?.name);
+                    const catColor = tx.category?.colorCode || (isIncome ? '#10B981' : '#64748B');
+                    const paymentLabel = formatPaymentMethod(tx.paymentMethod);
 
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <span 
-                          className="badge" 
-                          style={{ 
-                            background: isIncome ? '#ECFDF5' : '#F1F5F9', 
-                            color: isIncome ? '#059669' : '#334155', 
-                            borderColor: isIncome ? '#A7F3D0' : '#E2E8F0',
-                            fontSize: '0.725rem'
-                          }}
-                        >
-                          <Tag size={11} color={catColor} />
-                          {catName}
-                        </span>
-                      </td>
+                    return (
+                      <tr 
+                        key={tx.id} 
+                        style={{ borderBottom: '1px solid #F1F5F9', transition: 'var(--transition)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8FAFC'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                      >
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <div style={{ fontWeight: '700', color: '#0F172A' }}>{tx.title}</div>
+                          {tx.description && (
+                            <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+                              {tx.description}
+                            </div>
+                          )}
+                        </td>
 
-                      <td style={{ padding: '1rem 1.25rem', color: '#64748B' }}>
-                        {formatDate(tx.transactionDate || tx.expenseDate)}
-                      </td>
-
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <span style={{
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          background: '#F8FAFC',
-                          border: '1px solid #E2E8F0',
-                          color: '#475569'
-                        }}>
-                          {tx.paymentMethod || 'CARD'}
-                        </span>
-                      </td>
-
-                      <td style={{ 
-                        padding: '1rem 1.25rem', 
-                        textAlign: 'right', 
-                        fontWeight: '800', 
-                        fontSize: '0.95rem',
-                        color: isIncome ? '#10B981' : '#0F172A' 
-                      }}>
-                        {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
-                      </td>
-
-                      <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
-                        {tx.receiptUrl ? (
-                          <button
-                            onClick={() => setSelectedReceiptTx(tx)}
-                            className="btn btn-secondary btn-icon"
-                            title="View Receipt Attachment"
-                            style={{ padding: '0.35rem', color: '#10B981', borderColor: '#A7F3D0' }}
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <span 
+                            className="badge" 
+                            style={{ 
+                              background: isIncome ? '#ECFDF5' : '#F1F5F9', 
+                              color: isIncome ? '#059669' : '#334155', 
+                              borderColor: isIncome ? '#A7F3D0' : '#E2E8F0',
+                              fontSize: '0.725rem'
+                            }}
                           >
-                            <Paperclip size={14} />
-                          </button>
-                        ) : (
-                          <span style={{ color: '#CBD5E1', fontSize: '0.8rem' }}>—</span>
-                        )}
-                      </td>
+                            <Tag size={11} color={catColor} />
+                            {catName}
+                          </span>
+                        </td>
 
-                      <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => openEditModal(tx)}
-                          className="btn btn-secondary btn-icon"
-                          title="Edit Transaction"
-                          style={{ color: '#4F46E5', borderColor: '#C7D2FE', padding: '0.35rem', marginRight: '0.35rem' }}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(tx.id)}
-                          className="btn btn-secondary btn-icon"
-                          title="Delete Transaction"
-                          style={{ color: '#DC2626', borderColor: '#FECACA', padding: '0.35rem' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        <td style={{ padding: '1rem 1.25rem', color: '#64748B' }}>
+                          {formatDate(tx.transactionDate || tx.expenseDate)}
+                        </td>
+
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <span style={{
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            background: '#F8FAFC',
+                            border: '1px solid #E2E8F0',
+                            color: '#334155'
+                          }}>
+                            {paymentLabel}
+                          </span>
+                        </td>
+
+                        <td style={{ 
+                          padding: '1rem 1.25rem', 
+                          textAlign: 'right', 
+                          fontWeight: '800', 
+                          fontSize: '0.95rem',
+                          color: isIncome ? '#10B981' : '#0F172A' 
+                        }}>
+                          {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
+                        </td>
+
+                        <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
+                          {tx.receiptUrl ? (
+                            <button
+                              onClick={() => setSelectedReceiptTx(tx)}
+                              className="btn btn-secondary btn-icon"
+                              title="View & Download Receipt Attachment"
+                              style={{ padding: '0.35rem', color: '#10B981', borderColor: '#A7F3D0' }}
+                            >
+                              <Paperclip size={14} />
+                            </button>
+                          ) : (
+                            <span style={{ color: '#CBD5E1', fontSize: '0.8rem' }} title="No receipt attached">—</span>
+                          )}
+                        </td>
+
+                        <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => openEditModal(tx)}
+                            className="btn btn-secondary btn-icon"
+                            title={`Edit "${tx.title}"`}
+                            style={{ color: '#4F46E5', borderColor: '#C7D2FE', padding: '0.35rem', marginRight: '0.35rem' }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tx.id, tx.title)}
+                            className="btn btn-secondary btn-icon"
+                            title={`Delete "${tx.title}"`}
+                            style={{ color: '#DC2626', borderColor: '#FECACA', padding: '0.35rem' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {filteredTransactions.length > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.85rem 1.25rem',
+                background: '#F8FAFC',
+                borderTop: '1px solid #E2E8F0',
+                flexWrap: 'wrap',
+                gap: '0.75rem'
+              }}>
+                <div style={{ fontSize: '0.825rem', color: '#64748B' }}>
+                  Showing <strong>{Math.min((currentPage - 1) * pageSize + 1, filteredTransactions.length)}</strong> to <strong>{Math.min(currentPage * pageSize, filteredTransactions.length)}</strong> of <strong>{filteredTransactions.length}</strong> transactions
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: '#64748B' }}>
+                    <span>Rows:</span>
+                    <select
+                      className="form-select"
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', height: 'auto', width: 'auto' }}
+                    >
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem' }}
+                    >
+                      Prev
+                    </button>
+                    <span style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', fontSize: '0.825rem', fontWeight: '600', color: '#0F172A' }}>
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                      disabled={currentPage >= totalPages}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem' }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -573,7 +830,7 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
               <label className="form-label">Category</label>
               <select className="form-select" value={editingTransaction.categoryId || ''} onChange={e => setEditingTransaction(prev => ({ ...prev, categoryId: e.target.value }))}>
                 <option value="">General</option>
-                {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                {categories.map(category => <option key={category.id} value={category.id}>{formatCategoryName(category.name)}</option>)}
               </select>
             </div>
           )}
@@ -655,21 +912,68 @@ export const Transactions = ({ onNavigateAddExpense, onNavigateIncome }) => {
         </form>
       </Modal>
 
-      {/* Receipt Image Modal */}
+      {/* Receipt Preview & Download Modal */}
       {selectedReceiptTx && (
         <Modal 
           isOpen={true} 
           onClose={() => setSelectedReceiptTx(null)}
-          title={`Receipt: ${selectedReceiptTx.title}`}
+          title={`Receipt Document: ${selectedReceiptTx.title}`}
         >
-          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-            <img 
-              src={selectedReceiptTx.receiptUrl} 
-              alt="Receipt Attachment" 
-              style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E2E8F0' }}
-            />
-            <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#64748B' }}>
-              Attached for transaction on <strong>{formatDate(selectedReceiptTx.transactionDate || selectedReceiptTx.expenseDate)}</strong>
+          <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+            <div style={{
+              background: '#F8FAFC',
+              padding: '1rem',
+              borderRadius: '10px',
+              border: '1px solid #E2E8F0',
+              marginBottom: '1rem'
+            }}>
+              <img 
+                src={selectedReceiptTx.receiptUrl} 
+                alt="Receipt Attachment" 
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '55vh', 
+                  objectFit: 'contain', 
+                  borderRadius: '6px', 
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)' 
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              fontSize: '0.85rem', 
+              color: '#64748B',
+              padding: '0.5rem 0.25rem',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}>
+              <div>
+                Amount: <strong style={{ color: '#0F172A' }}>{formatCurrency(selectedReceiptTx.amount)}</strong> • Date: <strong>{formatDate(selectedReceiptTx.transactionDate || selectedReceiptTx.expenseDate)}</strong>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <a
+                  href={selectedReceiptTx.receiptUrl}
+                  download={`FinTrack_Receipt_${selectedReceiptTx.id || 'attachment'}.jpg`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                >
+                  Download Receipt
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                  onClick={() => setSelectedReceiptTx(null)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </Modal>

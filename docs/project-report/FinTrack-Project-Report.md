@@ -15,7 +15,7 @@ Corporate budget compliance and transparent financial reporting require low-late
 3. **Expense Service (Port 8083)**: Core transaction ledger, receipts attachment tracking, and Feign client resolution to Category Service.
 4. **Report Service (Port 8084)**: Financial intelligence engine computing monthly trends, portfolio breakdowns, and threshold compliance alerts.
 5. **API Gateway (Port 8080)**: Reverse proxy handling central routing, JWT validation filters, and CORS headers.
-6. **Eureka Server (Port 8761)**: Resilient service registration and dynamic heartbeats.
+6. **Eureka Server (Port 9000)**: Resilient service registration and dynamic heartbeats.
 
 ---
 

@@ -22,3 +22,4 @@ export const formatPercentage = (val) => {
   const num = typeof val === 'string' ? parseFloat(val) : val;
   return `${num > 0 ? '+' : ''}${num.toFixed(1)}%`;
 };
+

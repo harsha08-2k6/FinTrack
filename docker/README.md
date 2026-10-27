@@ -7,7 +7,7 @@ This directory provides the complete containerization configuration for spinning
 ## 📦 Containers Launched
 
 1. **`spendwise-mysql`** (`3306`) - MySQL 8.0 server with automated database seeding
-2. **`spendwise-eureka`** (`8761`) - Service Discovery Registry
+2. **`spendwise-eureka`** (`9000`) - Service Discovery Registry
 3. **`spendwise-auth`** (`8081`) - Authentication & Security Token Provider
 4. **`spendwise-category`** (`8082`) - Category Management
 5. **`spendwise-expense`** (`8083`) - Expense Tracking Microservice

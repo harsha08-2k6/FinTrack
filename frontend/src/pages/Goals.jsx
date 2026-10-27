@@ -1,55 +1,156 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Target, Trash2, CalendarDays, TrendingUp, WalletCards } from 'lucide-react';
+import { Plus, Target, Trash2, Pencil, CalendarDays, TrendingUp, WalletCards, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { formatCurrency } from '../utils/formatCurrency';
+import { useAuth } from '../context/AuthContext';
+import { notificationService } from '../services/notificationService';
 
-const STORAGE_KEY = 'fintrack_savings_goals';
-
-const readGoals = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
+const BASE_STORAGE_KEY = 'fintrack_savings_goals';
 
 export const Goals = () => {
+  const { user } = useAuth();
+  const storageKey = useMemo(() => {
+    return user?.id ? `${BASE_STORAGE_KEY}_${user.id}` : BASE_STORAGE_KEY;
+  }, [user]);
+
+  const readGoals = () => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) return JSON.parse(stored);
+      // Fallback check to un-scoped key if user-specific key is not found yet
+      const fallback = localStorage.getItem(BASE_STORAGE_KEY);
+      return fallback ? JSON.parse(fallback) : [];
+    } catch {
+      return [];
+    }
+  };
+
   const [goals, setGoals] = useState(readGoals);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ name: '', targetAmount: '', currentAmount: '', targetDate: '' });
   const [error, setError] = useState('');
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [editError, setEditError] = useState('');
   const [contributionGoal, setContributionGoal] = useState(null);
   const [contributionAmount, setContributionAmount] = useState('');
   const [contributionError, setContributionError] = useState('');
 
+  // Re-read when storageKey changes (e.g. user logs in)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
-  }, [goals]);
+    setGoals(readGoals());
+  }, [storageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(goals));
+    // Also sync to BASE_STORAGE_KEY for backwards compatibility
+    localStorage.setItem(BASE_STORAGE_KEY, JSON.stringify(goals));
+  }, [goals, storageKey]);
 
   const totals = useMemo(() => goals.reduce((summary, goal) => ({
     target: summary.target + Number(goal.targetAmount),
     saved: summary.saved + Number(goal.currentAmount)
   }), { target: 0, saved: 0 }), [goals]);
 
+  // Deadline & status calculation helper
+  const getDeadlineInfo = (targetDateStr) => {
+    if (!targetDateStr) return null;
+    const target = new Date(`${targetDateStr}T00:00:00`);
+    if (isNaN(target.getTime())) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffMs = target.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      const overdueDays = Math.abs(diffDays);
+      return {
+        label: `${overdueDays} ${overdueDays === 1 ? 'day' : 'days'} overdue`,
+        isOverdue: true,
+        days: diffDays
+      };
+    }
+    if (diffDays === 0) {
+      return {
+        label: 'Due today',
+        isDueToday: true,
+        days: 0
+      };
+    }
+    return {
+      label: `${diffDays} ${diffDays === 1 ? 'day' : 'days'} left`,
+      isOverdue: false,
+      days: diffDays
+    };
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    const targetAmount = Number(form.targetAmount);
-    const currentAmount = Number(form.currentAmount || 0);
-    if (!form.name.trim() || targetAmount <= 0 || currentAmount < 0 || currentAmount > targetAmount) {
-      setError('Enter a goal name, a positive target, and a saved amount within the target.');
+    const targetAmount = parseFloat(form.targetAmount);
+    const currentAmount = parseFloat(form.currentAmount || 0);
+
+    if (!form.name.trim()) {
+      setError('Please provide a goal name.');
       return;
     }
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      setError('Target amount must be a positive number.');
+      return;
+    }
+    if (isNaN(currentAmount) || currentAmount < 0) {
+      setError('Already saved amount cannot be negative.');
+      return;
+    }
+    if (currentAmount > targetAmount) {
+      setError('Already saved amount cannot exceed target amount.');
+      return;
+    }
+
     setGoals(previous => [{
       id: Date.now(),
       name: form.name.trim(),
       targetAmount,
       currentAmount,
-      targetDate: form.targetDate
+      targetDate: form.targetDate || ''
     }, ...previous]);
     setForm({ name: '', targetAmount: '', currentAmount: '', targetDate: '' });
     setError('');
     setIsModalOpen(false);
+  };
+
+  const handleEditSubmit = (event) => {
+    event.preventDefault();
+    if (!editingGoal) return;
+    const targetAmount = parseFloat(editingGoal.targetAmount);
+    const currentAmount = parseFloat(editingGoal.currentAmount || 0);
+
+    if (!editingGoal.name.trim()) {
+      setEditError('Please provide a goal name.');
+      return;
+    }
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      setEditError('Target amount must be a positive number.');
+      return;
+    }
+    if (isNaN(currentAmount) || currentAmount < 0) {
+      setEditError('Already saved amount cannot be negative.');
+      return;
+    }
+    if (currentAmount > targetAmount) {
+      setEditError('Already saved amount cannot exceed target amount.');
+      return;
+    }
+
+    setGoals(previous => previous.map(item => item.id === editingGoal.id ? {
+      ...item,
+      name: editingGoal.name.trim(),
+      targetAmount,
+      currentAmount,
+      targetDate: editingGoal.targetDate || ''
+    } : item));
+    setEditingGoal(null);
+    setEditError('');
   };
 
   const updateProgress = (goal, value) => {
@@ -65,18 +166,57 @@ export const Goals = () => {
 
   const handleContribution = (event) => {
     event.preventDefault();
-    const amount = Number(contributionAmount);
+    const amount = parseFloat(contributionAmount);
+    if (!contributionGoal) return;
     const remaining = Number(contributionGoal.targetAmount) - Number(contributionGoal.currentAmount);
-    if (amount <= 0 || amount > remaining) {
-      setContributionError(`Enter an amount up to ${formatCurrency(remaining)}.`);
+
+    if (isNaN(amount) || amount <= 0) {
+      setContributionError('Contribution amount must be greater than zero.');
       return;
     }
-    updateProgress(contributionGoal, Number(contributionGoal.currentAmount) + amount);
+    if (amount > remaining) {
+      setContributionError(`Contribution exceeds remaining target. Max allowed: ${formatCurrency(remaining)}.`);
+      return;
+    }
+
+    const updatedAmount = Number(contributionGoal.currentAmount) + amount;
+    const targetAmt = Number(contributionGoal.targetAmount);
+    const newProgress = Math.min(100, Math.round((updatedAmount / targetAmt) * 100));
+
+    updateProgress(contributionGoal, updatedAmount);
     setContributionGoal(null);
+
+    // Savings goal contribution notification
+    const goalName = contributionGoal.name;
+    const isCompleted = newProgress === 100;
+    notificationService.createNotification({
+      title: isCompleted ? `Goal "${goalName}" reached! 🎉` : `${goalName} savings goal updated`,
+      message: isCompleted
+        ? `Congratulations! Target of ${formatCurrency(targetAmt)} has been fully reached.`
+        : `${formatCurrency(amount)} contribution added. Your goal is now ${newProgress}% complete (${formatCurrency(updatedAmount)} of ${formatCurrency(targetAmt)} saved).`,
+      category: 'GOAL',
+      severity: isCompleted ? 'SUCCESS' : 'INFO',
+      actionUrl: 'goals',
+      metadata: { goalId: contributionGoal.id, goalName, amount, currentAmount: updatedAmount, targetAmount: targetAmt, progress: newProgress }
+    });
+
+    // Notify backend email notification engine
+    notificationService.recordSavingsGoalEvent({
+      goalId: String(contributionGoal.id),
+      goalName,
+      targetAmount: targetAmt,
+      currentAmount: updatedAmount,
+      contributionAmount: amount,
+      progressPercentage: newProgress,
+      targetDate: contributionGoal.targetDate || null,
+      eventType: isCompleted ? 'MILESTONE' : 'CONTRIBUTION'
+    });
   };
 
   const removeGoal = (id) => {
-    if (window.confirm('Delete this savings goal?')) {
+    const targetGoal = goals.find(g => g.id === id);
+    const goalName = targetGoal ? `"${targetGoal.name}"` : 'this savings goal';
+    if (window.confirm(`Are you sure you want to delete ${goalName}? This action cannot be undone.`)) {
       setGoals(previous => previous.filter(goal => goal.id !== id));
     }
   };
@@ -104,19 +244,92 @@ export const Goals = () => {
       ) : (
         <div className="grid-2">
           {goals.map(goal => {
-            const progress = Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
+            const current = Number(goal.currentAmount);
+            const target = Number(goal.targetAmount);
+            const remaining = Math.max(0, target - current);
+            const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+            const deadline = getDeadlineInfo(goal.targetDate);
+
             return (
               <div className="card" key={goal.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}><div className="dashboard-transaction-icon income"><TrendingUp size={18} /></div><div><h3>{goal.name}</h3>{goal.targetDate && <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.2rem' }}><CalendarDays size={13} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Target {goal.targetDate}</p>}</div></div>
-                  <button className="btn btn-secondary btn-icon" title="Delete goal" onClick={() => removeGoal(goal.id)}><Trash2 size={15} color="var(--danger)" /></button>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <div className="dashboard-transaction-icon income"><TrendingUp size={18} /></div>
+                    <div>
+                      <h3 style={{ margin: 0 }}>{goal.name}</h3>
+                      {goal.targetDate && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <CalendarDays size={13} />
+                            Target {goal.targetDate}
+                          </span>
+                          {deadline && (
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: '700',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '999px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              background: deadline.isOverdue ? '#FEF2F2' : (deadline.isDueToday ? '#FFFBEB' : '#F0FDF4'),
+                              color: deadline.isOverdue ? '#DC2626' : (deadline.isDueToday ? '#D97706' : '#15803D'),
+                              border: `1px solid ${deadline.isOverdue ? '#FECACA' : (deadline.isDueToday ? '#FDE68A' : '#BBF7D0')}`
+                            }}>
+                              <Clock size={11} />
+                              {deadline.label}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <button
+                      className="btn btn-secondary btn-icon"
+                      title="Edit goal"
+                      onClick={() => {
+                        setEditingGoal(goal);
+                        setEditError('');
+                      }}
+                      style={{ color: '#4F46E5', borderColor: '#C7D2FE' }}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button className="btn btn-secondary btn-icon" title="Delete goal" onClick={() => removeGoal(goal.id)}>
+                      <Trash2 size={15} color="var(--danger)" />
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', fontSize: '0.9rem' }}><strong>{formatCurrency(goal.currentAmount)}</strong><span style={{ color: 'var(--text-secondary)' }}>of {formatCurrency(goal.targetAmount)}</span></div>
-                <div className="progress-bar-bg" style={{ marginTop: '0.55rem', height: '10px' }}><div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress === 100 ? 'var(--accent-hover)' : 'var(--accent)' }} /></div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '1.5rem', fontSize: '0.9rem' }}>
+                  <strong>{formatCurrency(current)}</strong>
+                  <span style={{ color: 'var(--text-secondary)' }}>of {formatCurrency(target)}</span>
+                </div>
+
+                <div className="progress-bar-bg" style={{ marginTop: '0.55rem', height: '10px' }}>
+                  <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress === 100 ? 'var(--accent-hover)' : 'var(--accent)' }} />
+                </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.9rem', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <span style={{ color: 'var(--accent-hover)', fontWeight: '800' }}>{progress}% complete</span>
-                  {progress < 100 && <button className="btn btn-secondary" onClick={() => openContributionModal(goal)} style={{ padding: '0.45rem 0.75rem', color: 'var(--accent-hover)', borderColor: '#A7F3D0' }}><Plus size={14} /> Add funds</button>}
-                  {progress === 100 && <span className="badge badge-emerald">Goal reached</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ color: 'var(--accent-hover)', fontWeight: '800' }}>{progress}% complete</span>
+                    {progress < 100 && (
+                      <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: '600' }}>
+                        • {formatCurrency(remaining)} remaining
+                      </span>
+                    )}
+                  </div>
+                  {progress < 100 && (
+                    <button className="btn btn-secondary" onClick={() => openContributionModal(goal)} style={{ padding: '0.45rem 0.75rem', color: 'var(--accent-hover)', borderColor: '#A7F3D0' }}>
+                      <Plus size={14} /> Add funds
+                    </button>
+                  )}
+                  {progress === 100 && (
+                    <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <CheckCircle2 size={12} /> Goal reached
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -131,6 +344,60 @@ export const Goals = () => {
           <div className="grid-2"><div className="form-group"><label className="form-label">Target amount *</label><input className="form-input" required type="number" min="1" step="0.01" value={form.targetAmount} onChange={event => setForm({ ...form, targetAmount: event.target.value })} /></div><div className="form-group"><label className="form-label">Already saved</label><input className="form-input" type="number" min="0" step="0.01" value={form.currentAmount} onChange={event => setForm({ ...form, currentAmount: event.target.value })} /></div></div>
           <div className="form-group"><label className="form-label">Target date</label><input className="form-input" type="date" value={form.targetDate} onChange={event => setForm({ ...form, targetDate: event.target.value })} /></div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}><button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">Create Goal</button></div>
+        </form>
+      </Modal>
+
+      {/* Edit Goal Modal */}
+      <Modal isOpen={Boolean(editingGoal)} onClose={() => setEditingGoal(null)} title="Edit Savings Goal">
+        <form onSubmit={handleEditSubmit}>
+          {editError && <div className="form-error" style={{ marginBottom: '1rem', color: '#DC2626' }}>{editError}</div>}
+          <div className="form-group">
+            <label className="form-label">Goal name *</label>
+            <input
+              className="form-input"
+              required
+              value={editingGoal?.name || ''}
+              onChange={event => setEditingGoal(prev => ({ ...prev, name: event.target.value }))}
+            />
+          </div>
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Target amount *</label>
+              <input
+                className="form-input"
+                required
+                type="number"
+                min="1"
+                step="0.01"
+                value={editingGoal?.targetAmount || ''}
+                onChange={event => setEditingGoal(prev => ({ ...prev, targetAmount: event.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Already saved</label>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={editingGoal?.currentAmount || ''}
+                onChange={event => setEditingGoal(prev => ({ ...prev, currentAmount: event.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Target date</label>
+            <input
+              className="form-input"
+              type="date"
+              value={editingGoal?.targetDate || ''}
+              onChange={event => setEditingGoal(prev => ({ ...prev, targetDate: event.target.value }))}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setEditingGoal(null)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save Changes</button>
+          </div>
         </form>
       </Modal>
 

@@ -15,38 +15,75 @@ import {
   FileCode,
   ArrowUpDown,
   Receipt,
-  X
+  X,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
 import { exportToCSV, exportToJSON } from '../utils/exportUtils';
 
-export const Expenses = ({ onNavigateAddExpense }) => {
-  const [expenses, setExpenses] = useState([]);
+export const Expenses = ({ onNavigateAddExpense, initialCategory = '', initialStartDate = '', initialEndDate = '' }) => {
+  const [allExpenses, setAllExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedPayment, setSelectedPayment] = useState('ALL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [datePreset, setDatePreset] = useState('ALL');
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [datePreset, setDatePreset] = useState(initialStartDate ? 'CUSTOM' : 'ALL');
   const [sortBy, setSortBy] = useState('date_desc');
   const [viewMode, setViewMode] = useState('table');
   const [loading, setLoading] = useState(true);
 
+  // Notifications banner state (success / error feedback)
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification(prev => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
+
   // Modal for viewing receipt image
   const [selectedReceiptExpense, setSelectedReceiptExpense] = useState(null);
+
+  // Helper to normalize and prettify category names (e.g. 'EDUCATION' -> 'Education', 'HOUSING_AND_BILLS' -> 'Housing & Bills')
+  const formatCategoryName = (name) => {
+    if (!name) return 'General';
+    if (/^[A-Z0-9_]+$/.test(name)) {
+      return name
+        .toLowerCase()
+        .split('_')
+        .map(word => {
+          if (word === 'and') return '&';
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' ');
+    }
+    return name;
+  };
+
+  // Standardize payment method labels (e.g. CARD -> Card, BANK_TRANSFER -> Bank Transfer)
+  const formatPaymentMethod = (method) => {
+    if (!method) return 'Card';
+    const map = {
+      BANK_TRANSFER: 'Bank Transfer',
+      CARD: 'Card',
+      UPI: 'UPI',
+      CASH: 'Cash',
+      OTHER: 'Other'
+    };
+    return map[method] || method;
+  };
 
   const fetchExpenses = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (selectedCategory) params.categoryId = selectedCategory;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
+      // Fetch all expense and category data so client-side filtering works seamlessly
       const [expenseData, categoryData] = await Promise.all([
-        expenseService.getExpenses(params).catch(() => []),
+        expenseService.getExpenses({}).catch(() => []),
         categoryService.getAllCategories().catch(() => [])
       ]);
 
@@ -58,10 +95,11 @@ export const Expenses = ({ onNavigateAddExpense }) => {
         ? categoryData
         : (categoryData && Array.isArray(categoryData.content) ? categoryData.content : []);
 
-      setExpenses(expList);
+      setAllExpenses(expList);
       setCategories(catList);
     } catch (err) {
       console.error('Error fetching expenses:', err);
+      showNotification('error', 'Failed to load expenses.');
     } finally {
       setLoading(false);
     }
@@ -69,7 +107,7 @@ export const Expenses = ({ onNavigateAddExpense }) => {
 
   useEffect(() => {
     fetchExpenses();
-  }, [selectedCategory, startDate, endDate]);
+  }, []);
 
   const applyDatePreset = (preset) => {
     setDatePreset(preset);
@@ -98,20 +136,101 @@ export const Expenses = ({ onNavigateAddExpense }) => {
     }
   };
 
+  // Modal for editing expense
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const handleOpenEdit = (expense) => {
+    setEditError('');
+    setEditingExpense({
+      ...expense,
+      amount: expense.amount || '',
+      categoryId: expense.categoryId || expense.category?.id || '',
+      expenseDate: expense.expenseDate || expense.transactionDate || new Date().toISOString().split('T')[0],
+      paymentMethod: expense.paymentMethod || 'CARD',
+      description: expense.description || ''
+    });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingExpense?.title?.trim() || !editingExpense.amount || Number(editingExpense.amount) <= 0) {
+      setEditError('Enter a valid title and positive amount.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      await expenseService.updateExpense(editingExpense.id, {
+        title: editingExpense.title.trim(),
+        amount: Number(editingExpense.amount),
+        categoryId: Number(editingExpense.categoryId) || null,
+        expenseDate: editingExpense.expenseDate,
+        transactionDate: editingExpense.expenseDate,
+        paymentMethod: editingExpense.paymentMethod,
+        description: editingExpense.description || '',
+        receiptUrl: editingExpense.receiptUrl || ''
+      });
+      const updatedTitle = editingExpense.title.trim();
+      setEditingExpense(null);
+      await fetchExpenses();
+      showNotification('success', `Expense "${updatedTitle}" updated successfully.`);
+    } catch (err) {
+      setEditError(err.message || 'Failed to update expense');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this expense record?')) {
+    const target = allExpenses.find(e => String(e.id) === String(id));
+    const targetTitle = target?.title || 'Expense';
+    if (window.confirm(`Are you sure you want to delete "${targetTitle}"? This action cannot be undone.`)) {
       try {
         await expenseService.deleteExpense(id);
-        fetchExpenses();
+        await fetchExpenses();
+        showNotification('success', `"${targetTitle}" deleted successfully.`);
       } catch (err) {
-        alert('Delete failed: ' + err.message);
+        showNotification('error', 'Delete failed: ' + err.message);
       }
     }
   };
 
+  // Filtered and sorted list based on search, category, payment method, and dates
   const filteredAndSortedExpenses = useMemo(() => {
-    let list = [...expenses];
+    let list = [...allExpenses];
 
+    // Category filter: match either categoryId or category name
+    if (selectedCategory) {
+      list = list.filter(exp => {
+        const catId = exp.categoryId || exp.category?.id;
+        const catName = exp.category?.name;
+        return String(catId) === String(selectedCategory) || 
+               (selectedCategory && catName && catName.toLowerCase() === selectedCategory.toLowerCase());
+      });
+    }
+
+    // Payment method filter
+    if (selectedPayment !== 'ALL') {
+      list = list.filter(exp => exp.paymentMethod === selectedPayment);
+    }
+
+    // Date range filter
+    if (startDate) {
+      list = list.filter(exp => {
+        const date = exp.expenseDate || exp.transactionDate || '';
+        return date >= startDate;
+      });
+    }
+    if (endDate) {
+      list = list.filter(exp => {
+        const date = exp.expenseDate || exp.transactionDate || '';
+        return date <= endDate;
+      });
+    }
+
+    // Search query filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       list = list.filter(exp => (
@@ -122,15 +241,14 @@ export const Expenses = ({ onNavigateAddExpense }) => {
       ));
     }
 
-    if (selectedPayment !== 'ALL') {
-      list = list.filter(exp => exp.paymentMethod === selectedPayment);
-    }
-
+    // Sorting
     list.sort((a, b) => {
+      const dateA = a.expenseDate || a.transactionDate || 0;
+      const dateB = b.expenseDate || b.transactionDate || 0;
       if (sortBy === 'date_desc') {
-        return new Date(b.expenseDate || 0) - new Date(a.expenseDate || 0);
+        return new Date(dateB) - new Date(dateA);
       } else if (sortBy === 'date_asc') {
-        return new Date(a.expenseDate || 0) - new Date(b.expenseDate || 0);
+        return new Date(dateA) - new Date(dateB);
       } else if (sortBy === 'amount_desc') {
         return (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0);
       } else if (sortBy === 'amount_asc') {
@@ -142,8 +260,9 @@ export const Expenses = ({ onNavigateAddExpense }) => {
     });
 
     return list;
-  }, [expenses, searchTerm, selectedPayment, sortBy]);
+  }, [allExpenses, selectedCategory, selectedPayment, startDate, endDate, searchTerm, sortBy]);
 
+  // Reactive Summary Statistics for active filtered subset
   const stats = useMemo(() => {
     const count = filteredAndSortedExpenses.length;
     const total = filteredAndSortedExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
@@ -158,9 +277,10 @@ export const Expenses = ({ onNavigateAddExpense }) => {
       { key: 'id', label: 'ID' },
       { key: 'title', label: 'Title' },
       { key: 'amount', label: 'Amount (₹)', formatter: (item) => parseFloat(item.amount).toFixed(2) },
-      { key: 'category', label: 'Category', formatter: (item) => item.category?.name || 'Uncategorized' },
-      { key: 'expenseDate', label: 'Date', formatter: (item) => item.expenseDate },
-      { key: 'paymentMethod', label: 'Payment Method' },
+      { key: 'category', label: 'Category', formatter: (item) => formatCategoryName(item.category?.name) },
+      { key: 'expenseDate', label: 'Date', formatter: (item) => item.expenseDate || item.transactionDate },
+      { key: 'paymentMethod', label: 'Payment Method', formatter: (item) => formatPaymentMethod(item.paymentMethod) },
+      { key: 'rawPaymentMethod', label: 'Payment Method (Raw)', formatter: (item) => item.paymentMethod || 'CARD' },
       { key: 'description', label: 'Notes', formatter: (item) => item.description || '' },
       { key: 'receiptUrl', label: 'Has Receipt', formatter: (item) => item.receiptUrl ? 'YES' : 'NO' }
     ];
@@ -170,14 +290,55 @@ export const Expenses = ({ onNavigateAddExpense }) => {
   };
 
   const handleExportJSON = () => {
+    const formattedData = filteredAndSortedExpenses.map(item => ({
+      ...item,
+      categoryName: formatCategoryName(item.category?.name),
+      formattedPaymentMethod: formatPaymentMethod(item.paymentMethod)
+    }));
     const todayStr = new Date().toISOString().split('T')[0];
-    exportToJSON(filteredAndSortedExpenses, `fintrack_expenses_${todayStr}.json`);
+    exportToJSON(formattedData, `fintrack_expenses_${todayStr}.json`);
   };
 
-  const paymentOptions = ['ALL', 'CARD', 'UPI', 'CASH', 'BANK_TRANSFER', 'OTHER'];
+  const paymentOptions = [
+    { id: 'ALL', label: 'All' },
+    { id: 'CARD', label: 'Card' },
+    { id: 'UPI', label: 'UPI' },
+    { id: 'CASH', label: 'Cash' },
+    { id: 'BANK_TRANSFER', label: 'Bank Transfer' },
+    { id: 'OTHER', label: 'Other' }
+  ];
 
   return (
     <div className="page-wrapper">
+      {/* Toast Notification Banner */}
+      {notification && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.65rem',
+          padding: '0.75rem 1.25rem',
+          marginBottom: '1.25rem',
+          borderRadius: '8px',
+          background: notification.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+          border: `1px solid ${notification.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+          color: notification.type === 'success' ? '#065F46' : '#991B1B',
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+          transition: 'all 0.2s ease-in-out'
+        }}>
+          {notification.type === 'success' ? <CheckCircle size={18} color="#10B981" /> : <AlertCircle size={18} color="#EF4444" />}
+          <div style={{ flex: 1 }}>{notification.message}</div>
+          <button
+            onClick={() => setNotification(null)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center' }}
+            title="Dismiss notification"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Top Header Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -193,16 +354,16 @@ export const Expenses = ({ onNavigateAddExpense }) => {
             onClick={handleExportCSV}
             className="btn btn-secondary"
             style={{ fontSize: '0.825rem', padding: '0.5rem 0.9rem' }}
-            title="Export filtered records to CSV for Excel"
+            title={`Export all ${filteredAndSortedExpenses.length} filtered records to CSV for Excel`}
           >
             <FileSpreadsheet size={15} color="#10B981" />
-            <span>Export CSV</span>
+            <span>Export Filtered CSV ({filteredAndSortedExpenses.length})</span>
           </button>
           <button
             onClick={handleExportJSON}
             className="btn btn-secondary"
             style={{ fontSize: '0.825rem', padding: '0.5rem 0.8rem' }}
-            title="Export filtered records as JSON"
+            title={`Export all ${filteredAndSortedExpenses.length} filtered records as JSON`}
           >
             <FileCode size={15} color="#4F46E5" />
             <span>JSON</span>
@@ -296,7 +457,7 @@ export const Expenses = ({ onNavigateAddExpense }) => {
             <option value="">All Categories ({categories.length})</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.name}
+                {formatCategoryName(cat.name)}
               </option>
             ))}
           </select>
@@ -370,13 +531,13 @@ export const Expenses = ({ onNavigateAddExpense }) => {
           {/* Payment Method Filter Pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: '700', marginRight: '0.25rem' }}>PAYMENT:</span>
-            {paymentOptions.map(method => (
+            {paymentOptions.map(opt => (
               <button
-                key={method}
-                onClick={() => setSelectedPayment(method)}
-                className={`pill-btn ${selectedPayment === method ? 'active' : ''}`}
+                key={opt.id}
+                onClick={() => setSelectedPayment(opt.id)}
+                className={`pill-btn ${selectedPayment === opt.id ? 'active' : ''}`}
               >
-                {method === 'ALL' ? 'All' : method}
+                {opt.label}
               </button>
             ))}
           </div>
@@ -398,6 +559,7 @@ export const Expenses = ({ onNavigateAddExpense }) => {
         <ExpenseTable
           expenses={filteredAndSortedExpenses}
           onDelete={handleDelete}
+          onEdit={handleOpenEdit}
           onViewReceipt={(expense) => setSelectedReceiptExpense(expense)}
           onAddExpense={onNavigateAddExpense}
         />
@@ -413,6 +575,105 @@ export const Expenses = ({ onNavigateAddExpense }) => {
           ))}
         </div>
       )}
+
+      {/* Edit Expense Modal */}
+      <Modal isOpen={Boolean(editingExpense)} onClose={() => setEditingExpense(null)} title="Edit Expense Record">
+        <form onSubmit={handleEditSubmit}>
+          {editError && <div className="form-error" style={{ marginBottom: '1rem', color: '#DC2626' }}>{editError}</div>}
+          <div className="form-group">
+            <label className="form-label">Expense Title *</label>
+            <input
+              type="text"
+              className="form-input"
+              required
+              value={editingExpense?.title || ''}
+              onChange={(e) => setEditingExpense(prev => ({ ...prev, title: e.target.value }))}
+            />
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Amount (₹) *</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                className="form-input"
+                required
+                value={editingExpense?.amount || ''}
+                onChange={(e) => setEditingExpense(prev => ({ ...prev, amount: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select
+                className="form-select"
+                value={editingExpense?.categoryId || ''}
+                onChange={(e) => setEditingExpense(prev => ({ ...prev, categoryId: e.target.value }))}
+              >
+                <option value="">General</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Expense Date</label>
+              <input
+                type="date"
+                className="form-input"
+                required
+                value={editingExpense?.expenseDate || ''}
+                onChange={(e) => setEditingExpense(prev => ({ ...prev, expenseDate: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Payment Method</label>
+              <select
+                className="form-select"
+                value={editingExpense?.paymentMethod || 'CARD'}
+                onChange={(e) => setEditingExpense(prev => ({ ...prev, paymentMethod: e.target.value }))}
+              >
+                <option value="CARD">Credit / Debit Card</option>
+                <option value="UPI">UPI / Digital Wallet</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CASH">Cash</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Description / Notes</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              value={editingExpense?.description || ''}
+              onChange={(e) => setEditingExpense(prev => ({ ...prev, description: e.target.value }))}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setEditingExpense(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingEdit}
+              className="btn btn-primary"
+            >
+              {savingEdit ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Receipt Inspection Modal */}
       {selectedReceiptExpense && (

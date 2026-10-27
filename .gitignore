@@ -49,6 +49,9 @@ dist-ssr/
 .idea/
 *.iml
 .vscode/
+.settings/
+.project
+.classpath
 *.swp
 *.swo
 .DS_Store
@@ -58,3 +61,4 @@ Thumbs.db
 .env
 .env.local
 .env.production
+

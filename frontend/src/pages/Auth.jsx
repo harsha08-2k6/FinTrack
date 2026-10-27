@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { getPasswordRuleResults, isStrongPassword } from '../utils/passwordValidation';
 
-export const Auth = ({ initialMode = 'login', onSuccess }) => {
+export const Auth = ({ initialMode = 'login', onSuccess, onNavigateForgotPassword }) => {
   const { login, register } = useAuth();
   const [mode, setMode] = useState(initialMode); // 'login' | 'register'
   const [animating, setAnimating] = useState(false);
@@ -420,7 +420,7 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
                   </div>
                 </div>
 
-                {/* Remember Me Row */}
+                {/* Remember Me & Forgot Password Row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', fontSize: '0.85rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', userSelect: 'none', color: '#475569' }}>
                     <input
@@ -437,6 +437,31 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
                     />
                     <span>Remember me</span>
                   </label>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onNavigateForgotPassword) {
+                        onNavigateForgotPassword();
+                      } else {
+                        window.history.pushState({}, '', '/forgot-password');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#059669',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      padding: 0
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    Forgot Password?
+                  </button>
                 </div>
 
                 {/* Submit Button */}
@@ -789,7 +814,7 @@ export const Auth = ({ initialMode = 'login', onSuccess }) => {
             <span>•</span>
             <span>JWT Auth (:8081)</span>
             <span>•</span>
-            <span>Eureka Registry (:8761)</span>
+            <span>Eureka Registry (:9000)</span>
           </div>
         </div>
 

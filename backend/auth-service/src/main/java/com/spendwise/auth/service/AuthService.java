@@ -132,6 +132,12 @@ public class AuthService {
         return mapToUserDto(saved);
     }
 
+    public UserDto getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+        return mapToUserDto(user);
+    }
+
     public UserDto mapToUserDto(User user) {
         return UserDto.builder()
                 .id(user.getId())

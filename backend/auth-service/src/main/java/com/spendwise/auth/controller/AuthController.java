@@ -2,6 +2,8 @@ package com.spendwise.auth.controller;
 
 import com.spendwise.auth.dto.*;
 import com.spendwise.auth.service.AuthService;
+import com.spendwise.auth.service.PasswordResetService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +19,37 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, PasswordResetService passwordResetService) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String clientIp = resolveClientIp(httpRequest);
+        passwordResetService.processForgotPassword(request, clientIp);
+        return ResponseEntity.ok(Map.of("message", "If an account exists for this email, password reset instructions will be sent."));
+    }
+
+    @PostMapping("/validate-reset-token")
+    public ResponseEntity<Map<String, Object>> validateResetToken(
+            @Valid @RequestBody ValidateResetTokenRequest request
+    ) {
+        boolean isValid = passwordResetService.validateToken(request.getToken());
+        return ResponseEntity.ok(Map.of("valid", isValid));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        passwordResetService.resetPassword(request);
+        return ResponseEntity.ok(Map.of("message", "Password has been successfully reset. You can now log in with your new password."));
     }
 
     @PostMapping("/register")
@@ -42,6 +72,11 @@ public class AuthController {
             return ResponseEntity.ok(authService.getCurrentUser(userDetails.getUsername()));
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @GetMapping("/users/{id}")
+    public ResponseEntity<UserDto> getUserById(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(authService.getUserById(id));
     }
 
     @PostMapping("/change-password")
@@ -80,5 +115,14 @@ public class AuthController {
             return user.getId();
         }
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User authentication required");
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        if (request == null) return "unknown";
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

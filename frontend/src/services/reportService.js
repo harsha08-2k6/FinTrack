@@ -16,9 +16,10 @@ export const reportService = {
     }
   },
 
-  async getCategoryBreakdown() {
+  async getCategoryBreakdown(yearMonth) {
     try {
-      return await apiRequest('/api/reports/category-breakdown');
+      const url = yearMonth ? `/api/reports/category-breakdown?yearMonth=${encodeURIComponent(yearMonth)}` : '/api/reports/category-breakdown';
+      return await apiRequest(url);
     } catch {
       return [
         { categoryId: 3, categoryName: 'Software & Cloud SaaS', color: '#06B6D4', totalSpent: 18400.00, transactionCount: 2, percentage: 38.6 },

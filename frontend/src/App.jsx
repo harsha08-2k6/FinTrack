@@ -7,6 +7,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Income } from './pages/Income';
@@ -40,37 +42,78 @@ const pathPages = Object.entries(pagePaths).reduce((pages, [page, path]) => {
 
 const getPageFromLocation = () => pathPages[window.location.pathname] || 'not-found';
 
+const getInitialAuthView = () => {
+  const path = window.location.pathname;
+  if (path === '/reset-password') return 'reset-password';
+  if (path === '/forgot-password') return 'forgot-password';
+  if (path === '/register') return 'register';
+  return 'login';
+};
+
 function MainLayout() {
   const { isAuthenticated } = useAuth();
   const [activePage, setActivePage] = useState(getPageFromLocation);
-  const [authView, setAuthView] = useState('login'); // 'login' | 'register'
+  const [authView, setAuthView] = useState(getInitialAuthView);
+  const [expenseFilters, setExpenseFilters] = useState({ categoryId: '', startDate: '', endDate: '' });
 
   useEffect(() => {
-    const handlePopState = () => setActivePage(getPageFromLocation());
+    const handlePopState = () => {
+      setActivePage(getPageFromLocation());
+      setAuthView(getInitialAuthView());
+    };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = (page) => {
+  const navigate = (page, filterParams = null) => {
     const nextPath = pagePaths[page] || '/dashboard';
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, '', nextPath);
     }
+    if (filterParams && page === 'expenses') {
+      setExpenseFilters(filterParams);
+    }
     setActivePage(page);
   };
 
+  const navigateToAuth = (view) => {
+    const targetPath = view === 'reset-password' ? '/reset-password' :
+                       view === 'forgot-password' ? '/forgot-password' :
+                       view === 'register' ? '/register' : '/login';
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+    setAuthView(view);
+  };
+
   if (!isAuthenticated) {
+    if (authView === 'reset-password' || window.location.pathname === '/reset-password') {
+      return (
+        <ResetPassword
+          onNavigateLogin={() => navigateToAuth('login')}
+          onNavigateForgotPassword={() => navigateToAuth('forgot-password')}
+        />
+      );
+    }
+    if (authView === 'forgot-password' || window.location.pathname === '/forgot-password') {
+      return (
+        <ForgotPassword
+          onNavigateLogin={() => navigateToAuth('login')}
+        />
+      );
+    }
     if (authView === 'register') {
       return (
         <Register
-          onNavigateLogin={() => setAuthView('login')}
+          onNavigateLogin={() => navigateToAuth('login')}
           onSuccess={() => navigate('dashboard')}
         />
       );
     }
     return (
       <Login
-        onNavigateRegister={() => setAuthView('register')}
+        onNavigateRegister={() => navigateToAuth('register')}
+        onNavigateForgotPassword={() => navigateToAuth('forgot-password')}
         onSuccess={() => navigate('dashboard')}
       />
     );
@@ -100,6 +143,9 @@ function MainLayout() {
         return (
           <Expenses
             onNavigateAddExpense={() => navigate('add-expense')}
+            initialCategory={expenseFilters.categoryId}
+            initialStartDate={expenseFilters.startDate}
+            initialEndDate={expenseFilters.endDate}
           />
         );
       case 'add-expense':
@@ -111,7 +157,13 @@ function MainLayout() {
           />
         );
       case 'categories':
-        return <Categories />;
+        return (
+          <Categories
+            onNavigateExpenses={(categoryId, startDate, endDate) => {
+              navigate('expenses', { categoryId, startDate, endDate });
+            }}
+          />
+        );
       case 'analytics':
         return <Analytics />;
       case 'reports':
@@ -135,6 +187,7 @@ function MainLayout() {
         <Navbar
           activePage={activePage}
           onAddExpenseClick={() => navigate('add-expense')}
+          onNavigate={navigate}
           alertsCount={1}
         />
         <ProtectedRoute onNavigateLogin={() => navigate('dashboard')}>

@@ -90,9 +90,19 @@ export const expenseService = {
       });
     } catch {
       let list = getLocalExpenses();
-      list = list.map(e => e.id === parseInt(id) ? { ...e, ...expenseData, amount: parseFloat(expenseData.amount) || e.amount } : e);
+      list = list.map(e => String(e.id) === String(id) ? { ...e, ...expenseData, amount: parseFloat(expenseData.amount) || e.amount } : e);
       saveLocalExpenses(list);
-      return list.find(e => e.id === parseInt(id));
+
+      // Also sync to unified transactions
+      try {
+        const txRaw = localStorage.getItem('fintrack_local_transactions');
+        if (txRaw) {
+          const txs = JSON.parse(txRaw).map(t => String(t.id) === String(id) ? { ...t, ...expenseData, amount: parseFloat(expenseData.amount) || t.amount } : t);
+          localStorage.setItem('fintrack_local_transactions', JSON.stringify(txs));
+        }
+      } catch {}
+
+      return list.find(e => String(e.id) === String(id));
     }
   },
 
@@ -103,8 +113,18 @@ export const expenseService = {
       });
     } catch {
       let list = getLocalExpenses();
-      list = list.filter(e => e.id !== parseInt(id));
+      list = list.filter(e => String(e.id) !== String(id));
       saveLocalExpenses(list);
+
+      // Also sync delete to unified transactions
+      try {
+        const txRaw = localStorage.getItem('fintrack_local_transactions');
+        if (txRaw) {
+          const txs = JSON.parse(txRaw).filter(t => String(t.id) !== String(id));
+          localStorage.setItem('fintrack_local_transactions', JSON.stringify(txs));
+        }
+      } catch {}
+
       return null;
     }
   },

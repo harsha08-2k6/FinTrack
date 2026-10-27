@@ -47,6 +47,27 @@ export const authService = {
     return updatedUser;
   },
 
+  async forgotPassword(email) {
+    return await apiRequest('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
+  async validateResetToken(token) {
+    return await apiRequest('/api/auth/validate-reset-token', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
+  },
+
+  async resetPassword(token, newPassword) {
+    return await apiRequest('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword })
+    });
+  },
+
   logout() {
     clearAuthData();
   }

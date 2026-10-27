@@ -1,9 +1,9 @@
 import React from 'react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
-import { Trash2, Tag, Paperclip, Receipt, Plus } from 'lucide-react';
+import { Trash2, Pencil, Tag, Paperclip, Receipt, Plus } from 'lucide-react';
 
-export const ExpenseTable = ({ expenses, onDelete, onViewReceipt, onAddExpense }) => {
+export const ExpenseTable = ({ expenses, onDelete, onEdit, onViewReceipt, onAddExpense }) => {
   if (!expenses || expenses.length === 0) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px' }}>
@@ -54,7 +54,28 @@ export const ExpenseTable = ({ expenses, onDelete, onViewReceipt, onAddExpense }
           <tbody>
             {expenses.map((expense) => {
               const catColor = expense.category?.colorCode || '#10B981';
-              const catName = expense.category?.name || 'General';
+              const rawCatName = expense.category?.name || 'General';
+              // Format category name nicely (e.g. HOUSING_AND_BILLS -> Housing & Bills)
+              const formatCatName = (name) => {
+                if (!name) return 'General';
+                if (/^[A-Z0-9_]+$/.test(name)) {
+                  return name.toLowerCase().split('_').map(w => w === 'and' ? '&' : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                }
+                return name;
+              };
+              const catName = formatCatName(rawCatName);
+
+              // Standardized payment labels
+              const formatPayment = (method) => {
+                const map = {
+                  CARD: 'Card',
+                  UPI: 'UPI',
+                  CASH: 'Cash',
+                  BANK_TRANSFER: 'Bank Transfer',
+                  OTHER: 'Other'
+                };
+                return map[method] || method;
+              };
 
               return (
                 <tr 
@@ -93,7 +114,7 @@ export const ExpenseTable = ({ expenses, onDelete, onViewReceipt, onAddExpense }
                   </td>
                   <td style={{ padding: '1rem 1.25rem' }}>
                     <span style={{
-                      padding: '0.2rem 0.5rem',
+                      padding: '0.2rem 0.55rem',
                       borderRadius: '6px',
                       fontSize: '0.75rem',
                       fontWeight: '500',
@@ -101,7 +122,7 @@ export const ExpenseTable = ({ expenses, onDelete, onViewReceipt, onAddExpense }
                       border: '1px solid #E2E8F0',
                       color: '#475569'
                     }}>
-                      {expense.paymentMethod || 'CARD'}
+                      {formatPayment(expense.paymentMethod || 'CARD')}
                     </span>
                   </td>
                   <td style={{ padding: '1rem 1.25rem', textAlign: 'right', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading)' }}>
@@ -112,7 +133,7 @@ export const ExpenseTable = ({ expenses, onDelete, onViewReceipt, onAddExpense }
                       <button
                         onClick={() => onViewReceipt && onViewReceipt(expense)}
                         className="btn btn-secondary btn-icon"
-                        title="View Receipt"
+                        title="View Receipt Attachment"
                         style={{ padding: '0.35rem 0.5rem', color: '#059669', borderColor: '#A7F3D0' }}
                       >
                         <Paperclip size={14} />
@@ -122,12 +143,22 @@ export const ExpenseTable = ({ expenses, onDelete, onViewReceipt, onAddExpense }
                     )}
                   </td>
                   <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(expense)}
+                          className="btn btn-secondary btn-icon"
+                          title="Edit this expense"
+                          style={{ color: '#4F46E5', borderColor: '#C7D2FE', padding: '0.35rem' }}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
                       {onDelete && (
                         <button
                           onClick={() => onDelete(expense.id)}
                           className="btn btn-secondary btn-icon"
-                          title="Delete Expense"
+                          title="Delete this expense"
                           style={{ color: '#DC2626', borderColor: '#FECACA', padding: '0.35rem' }}
                         >
                           <Trash2 size={15} />

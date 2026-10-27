@@ -7,20 +7,20 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
 import { exportToCSV, exportToJSON } from '../utils/exportUtils';
 import { useAuth } from '../context/AuthContext';
-import { 
-  FileText, 
-  Printer, 
-  FileSpreadsheet, 
-  Download, 
-  Filter, 
-  Calendar, 
-  CheckCircle2, 
-  AlertTriangle, 
-  ShieldCheck, 
-  Building2, 
-  Search, 
-  ArrowUpDown, 
-  Layers, 
+import {
+  FileText,
+  Printer,
+  FileSpreadsheet,
+  Download,
+  Filter,
+  Calendar,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldCheck,
+  Building2,
+  Search,
+  ArrowUpDown,
+  Layers,
   CreditCard,
   FileCheck,
   TrendingUp,
@@ -39,7 +39,7 @@ export const Reports = () => {
   const [breakdown, setBreakdown] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
-  
+
   // Report Config State
   const [reportType, setReportType] = useState('executive'); // 'executive' | 'income_vs_expense' | 'budget_audit' | 'ledger'
   const [periodPreset, setPeriodPreset] = useState('CURRENT_MONTH'); // 'CURRENT_MONTH' | 'LAST_MONTH' | 'YTD' | 'CUSTOM'
@@ -95,6 +95,8 @@ export const Reports = () => {
       list = list.filter(e => (e.transactionDate || e.expenseDate || '').startsWith(lastMonthPrefix));
     } else if (periodPreset === 'YTD') {
       list = list.filter(e => (e.transactionDate || e.expenseDate || '').startsWith(`${currentYear}`));
+    } else if (periodPreset === 'ALL') {
+      // All-Time: No date filtering
     } else if (periodPreset === 'CUSTOM') {
       if (customStartDate) list = list.filter(e => (e.transactionDate || e.expenseDate || '') >= customStartDate);
       if (customEndDate) list = list.filter(e => (e.transactionDate || e.expenseDate || '') <= customEndDate);
@@ -106,7 +108,7 @@ export const Reports = () => {
 
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
-      list = list.filter(e => 
+      list = list.filter(e =>
         (e.title && e.title.toLowerCase().includes(q)) ||
         (e.description && e.description.toLowerCase().includes(q))
       );
@@ -323,7 +325,9 @@ export const Reports = () => {
               {[
                 { id: 'CURRENT_MONTH', label: 'This Month' },
                 { id: 'LAST_MONTH', label: 'Last Month' },
-                { id: 'YTD', label: 'This Year' }
+                { id: 'YTD', label: 'This Year' },
+                { id: 'ALL', label: 'All-Time' },
+                { id: 'CUSTOM', label: 'Custom' }
               ].map(p => (
                 <button
                   key={p.id}
@@ -334,6 +338,25 @@ export const Reports = () => {
                 </button>
               ))}
             </div>
+            {periodPreset === 'CUSTOM' && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="date"
+                  className="form-input"
+                  style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+                <span style={{ fontSize: '0.8rem', color: '#64748B' }}>to</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Type Filter */}
@@ -424,10 +447,10 @@ export const Reports = () => {
                 Monthly Financial Summary
               </h3>
               <p style={{ fontSize: '0.85rem', color: '#64748B' }}>
-                Period: <strong>{periodPreset === 'CURRENT_MONTH' ? 'This Month' : periodPreset === 'LAST_MONTH' ? 'Last Month' : 'This Year'}</strong> • Generated for <strong>{user?.fullName || 'User'}</strong>
+                Period: <strong>{periodPreset === 'CURRENT_MONTH' ? 'This Month' : periodPreset === 'LAST_MONTH' ? 'Last Month' : periodPreset === 'YTD' ? 'This Year' : periodPreset === 'ALL' ? 'All-Time' : 'Custom Range'}</strong> • Generated for <strong>{user?.fullName || user?.username || 'User'}</strong>
               </p>
             </div>
-            <span className="badge badge-emerald">Verified Statement</span>
+            <span className="badge" style={{ background: '#F1F5F9', color: '#475569', borderColor: '#CBD5E1' }}>Summary Statement</span>
           </div>
 
           <div className="grid-2" style={{ marginBottom: '2rem' }}>
@@ -486,8 +509,8 @@ export const Reports = () => {
             Historical cashflow trend comparison across accounting cycles
           </p>
 
-          <StockMarketChart 
-            data={trends} 
+          <StockMarketChart
+            data={trends}
             title="Net Cashflow Timeline"
             subtext="Market-style expenditure timeline vs historical averages"
             height={260}
@@ -581,35 +604,44 @@ export const Reports = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.map((tx) => {
-                  const isIncome = tx.type === 'INCOME';
-                  return (
-                    <tr key={tx.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '1rem 1.25rem', color: '#64748B' }}>
-                        {formatDate(tx.transactionDate || tx.expenseDate)}
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem', fontWeight: '700', color: '#0F172A' }}>
-                        {tx.title}
-                        {tx.description && <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '400' }}>{tx.description}</div>}
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <span className="badge" style={{
-                          background: isIncome ? '#ECFDF5' : '#F1F5F9',
-                          color: isIncome ? '#059669' : '#475569',
-                          borderColor: isIncome ? '#A7F3D0' : '#E2E8F0'
-                        }}>
-                          {isIncome ? 'INCOME' : (tx.category?.name || 'EXPENSE')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem', color: '#64748B' }}>
-                        {tx.paymentMethod || 'CARD'}
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem', textAlign: 'right', fontWeight: '800', color: isIncome ? '#10B981' : '#0F172A' }}>
-                        {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748B' }}>
+                      <p style={{ margin: 0, fontWeight: '600', fontSize: '0.95rem' }}>No financial records found for this period or filter.</p>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Try choosing another time period or clearing your search query.</span>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTransactions.map((tx) => {
+                    const isIncome = tx.type === 'INCOME';
+                    return (
+                      <tr key={tx.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '1rem 1.25rem', color: '#64748B' }}>
+                          {formatDate(tx.transactionDate || tx.expenseDate)}
+                        </td>
+                        <td style={{ padding: '1rem 1.25rem', fontWeight: '700', color: '#0F172A' }}>
+                          {tx.title}
+                          {tx.description && <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '400' }}>{tx.description}</div>}
+                        </td>
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <span className="badge" style={{
+                            background: isIncome ? '#ECFDF5' : '#F1F5F9',
+                            color: isIncome ? '#059669' : '#475569',
+                            borderColor: isIncome ? '#A7F3D0' : '#E2E8F0'
+                          }}>
+                            {isIncome ? 'INCOME' : (tx.category?.name || 'EXPENSE')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem 1.25rem', color: '#64748B' }}>
+                          {tx.paymentMethod || 'CARD'}
+                        </td>
+                        <td style={{ padding: '1rem 1.25rem', textAlign: 'right', fontWeight: '800', color: isIncome ? '#10B981' : '#0F172A' }}>
+                          {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
